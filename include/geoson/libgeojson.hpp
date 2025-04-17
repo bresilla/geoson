@@ -6,7 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace geojson {
+namespace geoson {
 
     enum class Type {
         Point,
@@ -619,4 +619,51 @@ namespace geojson {
         }
         return j;
     }
-} // namespace geojson
+    namespace op {
+
+        //--------------------------------------------------------------------
+        // Read  --------------------------------------------------------------
+        //--------------------------------------------------------------------
+        inline nlohmann::json ReadFeatureCollection(const std::filesystem::path &file) {
+            std::ifstream ifs(file);
+            if (!ifs)
+                throw std::runtime_error("geoson::ReadFeatureCollection(): cannot open \"" + file.string() + '\"');
+
+            nlohmann::json j;
+            ifs >> j;
+
+            if (!j.is_object() || !j.contains("type") || !j["type"].is_string())
+                throw std::runtime_error(
+                    "geoson::ReadFeatureCollection(): top‑level object has no string 'type' field");
+
+            const std::string type = j["type"].get<std::string>();
+
+            if (type == "FeatureCollection") return j; // as‑is
+
+            if (type == "Feature") // wrap Feature
+                return nlohmann::json{{"type", "FeatureCollection"}, {"features", nlohmann::json::array({j})}};
+
+            // otherwise treat it as a bare geometry --------------------------------
+            nlohmann::json feature{
+                {"type", "Feature"}, {"geometry", j}, {"properties", nlohmann::json::object()}}; // empty props
+
+            return nlohmann::json{{"type", "FeatureCollection"}, {"features", nlohmann::json::array({feature})}};
+        }
+
+        //--------------------------------------------------------------------
+        // Write --------------------------------------------------------------
+        //--------------------------------------------------------------------
+        inline void SaveFeatureCollection(const nlohmann::json &fc, const std::filesystem::path &file) {
+            if (!fc.is_object() || fc.value("type", "") != "FeatureCollection")
+                throw std::invalid_argument("geoson::SaveFeatureCollection(): input JSON is not a FeatureCollection");
+
+            std::ofstream ofs(file);
+            if (!ofs)
+                throw std::runtime_error("geoson::SaveFeatureCollection(): cannot open \"" + file.string() + '\"');
+
+            ofs << fc.dump(4); // pretty‑printed with 4‑space indent
+        }
+
+    } // namespace op
+
+} // namespace geoson
