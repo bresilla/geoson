@@ -4,12 +4,6 @@ project(geoson VERSION 0.1.0 LANGUAGES CXX)
 include(FetchContent)
 
 # -----------------------------------------------------------------------------
-# 1) Fetch nlohmann/json dependency
-# -----------------------------------------------------------------------------
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
-FetchContent_MakeAvailable(json)
-
-# -----------------------------------------------------------------------------
 # 2) Create the header‐only INTERFACE library
 # -----------------------------------------------------------------------------
 add_library(geoson INTERFACE)
@@ -25,12 +19,6 @@ target_include_directories(geoson
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-)
-
-# Link against nlohmann_json
-target_link_libraries(geoson
-    INTERFACE
-        nlohmann_json::nlohmann_json
 )
 
 # -----------------------------------------------------------------------------
