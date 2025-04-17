@@ -29,11 +29,6 @@ include(GNUInstallDirs)
 # 4a) Install headers
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# 4b) Install and export the INTERFACE target
-install(TARGETS geoson nlohmann_json
-    EXPORT geosonTargets
-)
-
 # 4c) Install the export file so that `find_package(geoson)` works
 install(EXPORT geosonTargets
     FILE geosonTargets.cmake
