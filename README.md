@@ -1,4 +1,11 @@
-# GeoJSON for Modern C++
+
+<img align="right" width="26%" src="./misc/logo.png">
+
+Geoson
+===
+
+A C++ library for working with geojson files.
+
 
 This library serves as wrapper around [JSON for Modern C++](https://github.com/nlohmann/json) for the GeoJSON ([RFC 7946](https://tools.ietf.org/html/rfc7946)) standard. This library provides a set of functions to create GeoJSON objects in the form of `nlohmann::json` objects. This library does not assume any geometry data types and instead uses a callback interface to allow the user to encode their own data types into GeoJSON.
 
