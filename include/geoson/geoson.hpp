@@ -1075,7 +1075,7 @@ namespace geoson {
             throw std::runtime_error("Cannot open " + path + " for writing");
         }
         // NOTE: this assumes your to_string(obj) produces valid GeoJSON!
-        ofs << geojson::to_string(obj);
+        ofs << to_string(obj);
         // flush/close on destruction
     }
 
