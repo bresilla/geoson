@@ -33,6 +33,8 @@ namespace geoson {
         double y;
         double z; // Optional z-coordinate, NaN if not present
 
+        std::string uuid;
+
         Coordinate(double x_, double y_) : x(x_), y(y_), z(std::numeric_limits<double>::quiet_NaN()) {}
         Coordinate(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
 
