@@ -6,10 +6,7 @@ include(FetchContent)
 # -----------------------------------------------------------------------------
 # 1) Fetch nlohmann/json dependency
 # -----------------------------------------------------------------------------
-FetchContent_Declare(json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-    URL_HASH SHA256=d6c65aca6b1ed68e7a182f9e50780b8726b06865be2626edf1e3f385756f8297
-)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
 FetchContent_MakeAvailable(json)
 
 # -----------------------------------------------------------------------------
