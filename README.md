@@ -8,22 +8,22 @@ For all positions in this library, the longitude and latitude are in decimal deg
 
 ### Point
 
-In order to encode a Point, use `geojson::Point()`. For example,
+In order to encode a Point, use `geoson::Point()`. For example,
 
 ```cpp
-auto j2d = geojson::Point(lon, lat);
-auto j3d = geojson::Point(lon, lat, alt);
+auto j2d = geoson::Point(lon, lat);
+auto j3d = geoson::Point(lon, lat, alt);
 ```
 
 ### MultiPoint
 
-In order to encode a MultiPoint, use `geojson::MultiPoint()`. For example,
+In order to encode a MultiPoint, use `geoson::MultiPoint()`. For example,
 
 ```cpp
 std::vector<std::array<double, 2>> pts{
     {-40.5, 32.2}, {-39, 33.1}, {-39.5, 33.02}
 };
-auto j = geojson::MultiPoint(pts.size(), [&pts](size_t pt, double& lon, double& lat) {
+auto j = geoson::MultiPoint(pts.size(), [&pts](size_t pt, double& lon, double& lat) {
   lon = pts[pt][0];
   lat = pts[pt][1];
 });
@@ -32,13 +32,13 @@ The callback can also take a third `double&` for altitude.
 
 ### LineString
 
-In order to encode a LineString, use `geojson::LineString()`. For example,
+In order to encode a LineString, use `geoson::LineString()`. For example,
 
 ```cpp
 std::vector<std::array<double, 2>> pts{
     {-40.5, 32.2}, {-39, 33.1}, {-39.5, 33.02}
 };
-auto j = geojson::LineString(pts.size(), [&pts](size_t pt, double& lon, double& lat) {
+auto j = geoson::LineString(pts.size(), [&pts](size_t pt, double& lon, double& lat) {
   lon = pts[pt][0];
   lat = pts[pt][1];
 });
@@ -47,14 +47,14 @@ The callback can also take a third `double&` for altitude.
 
 ### MultiLineString
 
-In order to encode a MultiLineString, use `geojson::MultiLineString()`. The first callback is used to determine the length of each line string and the second is used for getting the points in each line string. For example,
+In order to encode a MultiLineString, use `geoson::MultiLineString()`. The first callback is used to determine the length of each line string and the second is used for getting the points in each line string. For example,
 
 ```cpp
 std::vector<std::vector<std::array<double, 2>>> pts{
     {{-40.5, 32.2}, {-39, 33.1}, {-39.5, 33.02}},
     {{-35.1, 10}, {-35.2, 10.1}}
 };
-auto j = geojson::MultiLineString(pts.size(),
+auto j = geoson::MultiLineString(pts.size(),
     [&pts](size_t line) { return pts[line].size(); },
     [&pts](size_t line, size_t pt, double& lon, double& lat) {
       lon = pts[line][pt][0];
@@ -65,7 +65,7 @@ The callback can also take a third `double&` for altitude.
 
 ### Polygon
 
-In order to encode a Polygon, use `geojson::Polygon()`. The first callback is used to determine the length of each linear ring and the second is used for getting the points in each ring. The function handles the clockwise and counter-clockwise ordering, as well as closing the rings. For example,
+In order to encode a Polygon, use `geoson::Polygon()`. The first callback is used to determine the length of each linear ring and the second is used for getting the points in each ring. The function handles the clockwise and counter-clockwise ordering, as well as closing the rings. For example,
 ```cpp
 std::vector<std::array<double, 3>> outer{
     {0, 0, 0.5}, {1.5, 0, 0.3}, {1.5, 1.5, 0.6}, {0, 1.5, 0.9}};
@@ -73,7 +73,7 @@ std::vector<std::vector<std::array<double, 3>>> inners{
     {{0.25, 0.25, 0.5}, {0.35, 0.75, 0.6}, {0.5, 0.25, 0.7}},
     {{1, 0.25, 0.5}, {1.25, 0.25, 0.6}, {1.125, 0.5, 0.7}}};
 
-auto j = geojson::Polygon(
+auto j = geoson::Polygon(
     inners.size() + 1,
     [&](size_t ring) {
       return ring == 0 ? outer.size() : inners[ring - 1].size();
@@ -95,7 +95,7 @@ If you don't want altitude, the last `double&` can be omitted.
 
 ## MultiPolygon
 
-In order to encode a MultiPolygon, use `geojson::MultiPolygon()`. The first callback is used to determine the number of rings in each polygon, the second is used to determine the length of each linear ring in each polygon and the third is used for getting the points in each ring. The function handles the clockwise and counter-clockwise ordering, as well as closing the rings. For example,
+In order to encode a MultiPolygon, use `geoson::MultiPolygon()`. The first callback is used to determine the number of rings in each polygon, the second is used to determine the length of each linear ring in each polygon and the third is used for getting the points in each ring. The function handles the clockwise and counter-clockwise ordering, as well as closing the rings. For example,
 ```cpp
 std::vector<std::vector<std::array<double, 3>>> outers{
     {{0, 0, 0.5}, {1.5, 0, 0.3}, {1.5, 1.5, 0.6}, {0, 1.5, 0.9}},
@@ -105,7 +105,7 @@ std::vector<std::vector<std::vector<std::array<double, 3>>>> inners{
      {{1, 0.25, 0.5}, {1.25, 0.25, 0.6}, {1.125, 0.5, 0.7}}},
     {}};
 
-auto j = geojson::MultiPolygon(
+auto j = geoson::MultiPolygon(
     outers.size(),
     [&](size_t poly) { return inners[poly].size() + 1; },
     [&](size_t poly, size_t ring) {
@@ -128,7 +128,7 @@ If you don't want altitude, the last `double&` can be omitted.
 
 ## Feature
 
-In order to encode a Feature, use `geojson::Feature()`. For example,
+In order to encode a Feature, use `geoson::Feature()`. For example,
 ```cpp
 struct Props {
   Props(const std::string& _name) : name(_name) {}
@@ -139,27 +139,27 @@ void to_json(nlohmann::json& j, const Props& props) {
   return nlohmann::json{{"name", props.name}};
 }
 
-auto j1 = geojson::Feature("id1", geojson::Point(-40, 30),
+auto j1 = geoson::Feature("id1", geoson::Point(-40, 30),
                            nlohmann::json(Props("foo")));
-auto j2 = geojson::Feature(2, geojson::Point(-40, 30),
+auto j2 = geoson::Feature(2, geoson::Point(-40, 30),
                            nlohmann::json(Props("foo2")));
-auto j3 = geojson::Feature(geojson::Point(-40, 30),
+auto j3 = geoson::Feature(geoson::Point(-40, 30),
                            nlohmann::json(Props("foo2")));
 ```
 In the case of `j3`, no `"id"` element will be added to the feature.
 
 ## FeatureCollection
 
-In order to encode a Feature, use `geojson::FeatureCollection()`. The callback is used to get the features in the collection. For example,
+In order to encode a Feature, use `geoson::FeatureCollection()`. The callback is used to get the features in the collection. For example,
 
 ```cpp
 std::vector<std::array<double, 2>> pts{
     {-40.5, 32.2}, {-39, 33.1}, {-39.5, 33.02}
 };
 
-auto j = geojson::FeatureCollection(pts.size(), [&](size_t i) {
-  return geojson::Feature(
-      i, geojson::Point(pts[i][0], pts[i][1]),
+auto j = geoson::FeatureCollection(pts.size(), [&](size_t i) {
+  return geoson::Feature(
+      i, geoson::Point(pts[i][0], pts[i][1]),
       nlohmann::json(Props(std::string("foo") + std::to_string(i))));
 });
 ```
