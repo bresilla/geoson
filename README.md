@@ -163,3 +163,7 @@ auto j = geojson::FeatureCollection(pts.size(), [&](size_t i) {
       nlohmann::json(Props(std::string("foo") + std::to_string(i))));
 });
 ```
+
+## Acknowledgements
+
+This library is a fork of [libgeojson](https://github.com/psalvaggio/libgeojson).
