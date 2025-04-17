@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace geojson {
+namespace geoson {
 
     // Forward declarations
     class GeoJSONObject;
@@ -1079,6 +1079,6 @@ namespace geojson {
         // flush/close on destruction
     }
 
-} // namespace geojson
+} // namespace geoson
 
 #endif // GEOJSON_PARSER_HPP
