@@ -13,6 +13,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(params
+    -Wno-reorder
+)
 
 # --------------------------------------------------------------------------------------------------
 include(FetchContent)
