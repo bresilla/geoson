@@ -1,60 +1,114 @@
-cmake_minimum_required(VERSION 3.14)
-project(geoson VERSION 0.1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.15)
 
+set(project_name geoson)
+
+project(${project_name} VERSION 0.1.1 LANGUAGES CXX)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+cmake_policy(SET CMP0074 NEW)
+cmake_policy(SET CMP0135 NEW)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED On)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# --------------------------------------------------------------------------------------------------
 include(FetchContent)
+FetchContent_Declare(
+  concord
+  GIT_REPOSITORY https://github.com/smolfetch/concord.git
+  GIT_TAG        main
+)
+FetchContent_MakeAvailable(concord)
 
-# -----------------------------------------------------------------------------
-# 1) Fetch nlohmann/json dependency
-# -----------------------------------------------------------------------------
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_Declare(
+  pigment
+  GIT_REPOSITORY https://github.com/smolfetch/pigment.git
+  GIT_TAG        main
+)
+FetchContent_MakeAvailable(pigment)
+
+FetchContent_Declare(
+    json 
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+)
 FetchContent_MakeAvailable(json)
 
-# -----------------------------------------------------------------------------
-# 2) Create the header‐only INTERFACE library
-# -----------------------------------------------------------------------------
-add_library(geoson INTERFACE)
-
-# Allow users to link via `geoson::geoson`
-add_library(geoson::geoson ALIAS geoson)
-
-# -----------------------------------------------------------------------------
-# 3) Public include path and dependencies
-# -----------------------------------------------------------------------------
-# This makes <geoson/enu_geosoner.h> etc. resolve to include/geoson/...
-target_include_directories(geoson
-    INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+# --------------------------------------------------------------------------------------------------
+add_library(${project_name} INTERFACE)
+target_include_directories(${project_name} INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
-# Link against nlohmann_json
-target_link_libraries(geoson
-    INTERFACE
-        nlohmann_json::nlohmann_json
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+include_directories(include)
+
+# --------------------------------------------------------------------------------------------------
+set(internal_deps
 )
 
-# -----------------------------------------------------------------------------
-# 4) Installation & Export for find_package()
-# -----------------------------------------------------------------------------
+set(external_deps
+  concord::concord
+  pigment::pigment
+  nlohmann_json::nlohmann_json
+)
+
+set(exe
+  src/exe.cpp
+)
+
+# --------------------------------------------------------------------------------------------------
+set(exec_names)
+foreach(src_file IN LISTS exe)
+  get_filename_component(exec_name "${src_file}" NAME_WE)
+  add_executable(${exec_name} "${src_file}")
+  foreach(lib_file IN LISTS internal_deps)
+    target_compile_options(${exec_name} PRIVATE ${params})
+    target_sources(${exec_name} PRIVATE "${lib_file}")
+  endforeach()
+  target_link_libraries(${exec_name} ${external_deps})
+  install(TARGETS ${exec_name} DESTINATION bin)
+  list(APPEND exec_names ${exec_name})
+endforeach()
+
+
+foreach(exec IN LISTS exec_names)
+  file(REMOVE "${CMAKE_CURRENT_LIST_DIR}/.execs")
+  file(WRITE "${CMAKE_CURRENT_LIST_DIR}/.execs")
+  get_filename_component(exec_name "${exec}" NAME)
+  file(APPEND "${CMAKE_CURRENT_LIST_DIR}/.execs" "${CMAKE_CURRENT_LIST_DIR}/build/${exec_name}\n")
+endforeach()
+
+
+install(TARGETS
+  ${exec_names}
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# --------------------------------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-# 4a) Install headers
+#Install headers
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# 4b) Install and export the INTERFACE target
-install(TARGETS geoson nlohmann_json
-    EXPORT geosonTargets
+#Install and export the INTERFACE target
+install(TARGETS ${project_name} EXPORT ${project_name}Targets)
+
+#Install the export file so that `find_package(${project_name})` works
+install(EXPORT ${project_name}Targets
+  FILE ${project_name}Targets.cmake
+  NAMESPACE ${project_name}::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name}
 )
 
-# 4c) Install the export file so that `find_package(geoson)` works
-install(EXPORT geosonTargets
-    FILE geosonTargets.cmake
-    NAMESPACE geoson::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/geoson
-)
-
-# 4d) Also export it for in‐source FetchContent usage
-export(EXPORT geosonTargets
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/geosonTargets.cmake"
-    NAMESPACE geoson::
+#Also export it for in‐source FetchContent usage
+export(EXPORT ${project_name}Targets
+  FILE "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Targets.cmake"
+  NAMESPACE ${project_name}::
 )
