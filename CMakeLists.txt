@@ -17,6 +17,8 @@ set(params
     -Wno-reorder
 )
 
+option(BUILD_EXAMPLES "Build examples" OFF)
+
 # --------------------------------------------------------------------------------------------------
 include(FetchContent)
 FetchContent_Declare(
@@ -53,48 +55,6 @@ install(
 include_directories(include)
 
 # --------------------------------------------------------------------------------------------------
-set(internal_deps
-)
-
-set(external_deps
-  concord::concord
-  pigment::pigment
-  nlohmann_json::nlohmann_json
-)
-
-set(exe
-  src/exe.cpp
-)
-
-# --------------------------------------------------------------------------------------------------
-set(exec_names)
-foreach(src_file IN LISTS exe)
-  get_filename_component(exec_name "${src_file}" NAME_WE)
-  add_executable(${exec_name} "${src_file}")
-  foreach(lib_file IN LISTS internal_deps)
-    target_compile_options(${exec_name} PRIVATE ${params})
-    target_sources(${exec_name} PRIVATE "${lib_file}")
-  endforeach()
-  target_link_libraries(${exec_name} ${external_deps})
-  install(TARGETS ${exec_name} DESTINATION bin)
-  list(APPEND exec_names ${exec_name})
-endforeach()
-
-
-foreach(exec IN LISTS exec_names)
-  file(REMOVE "${CMAKE_CURRENT_LIST_DIR}/.execs")
-  file(WRITE "${CMAKE_CURRENT_LIST_DIR}/.execs")
-  get_filename_component(exec_name "${exec}" NAME)
-  file(APPEND "${CMAKE_CURRENT_LIST_DIR}/.execs" "${CMAKE_CURRENT_LIST_DIR}/build/${exec_name}\n")
-endforeach()
-
-
-install(TARGETS
-  ${exec_names}
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# --------------------------------------------------------------------------------------------------
 include(GNUInstallDirs)
 
 #Install headers
@@ -115,3 +75,41 @@ export(EXPORT ${project_name}Targets
   FILE "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Targets.cmake"
   NAMESPACE ${project_name}::
 )
+
+
+# --------------------------------------------------------------------------------------------------
+if(BUILD_EXAMPLES)
+  set(external_deps
+    concord::concord
+    pigment::pigment
+    nlohmann_json::nlohmann_json
+  )
+  set(exe
+    examples/exe.cpp
+  )
+  # ----------------------------------------------
+  set(exec_names)
+  foreach(src_file IN LISTS exe)
+    get_filename_component(exec_name "${src_file}" NAME_WE)
+    add_executable(${exec_name} "${src_file}")
+      foreach(lib_file IN LISTS internal_deps)
+        target_compile_options(${exec_name} PRIVATE ${params})
+        target_sources(${exec_name} PRIVATE "${lib_file}")
+      endforeach()
+    target_link_libraries(${exec_name} ${external_deps})
+    install(TARGETS ${exec_name} DESTINATION bin)
+    list(APPEND exec_names ${exec_name})
+  endforeach()
+  # ----------------------------------------------
+  foreach(exec IN LISTS exec_names)
+    file(REMOVE "${CMAKE_CURRENT_LIST_DIR}/.execs")
+    file(WRITE "${CMAKE_CURRENT_LIST_DIR}/.execs")
+    get_filename_component(exec_name "${exec}" NAME)
+    file(APPEND "${CMAKE_CURRENT_LIST_DIR}/.execs" "${CMAKE_CURRENT_LIST_DIR}/build/${exec_name}\n")
+  endforeach()
+  # ----------------------------------------------
+  install(TARGETS
+    ${exec_names}
+    DESTINATION lib/${PROJECT_NAME}
+  )
+endif()

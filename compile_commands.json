@@ -1,1 +1,8 @@
-build/compile_commands.json
+[
+{
+  "directory": "/doc/code/geoson/build",
+  "command": "/doc/code/geoson/.devbox/nix/profile/default/bin/g++  -I/doc/code/geoson/include -I/doc/code/geoson/build/_deps/concord-src/include -I/doc/code/geoson/build/_deps/pigment-src/include -I/doc/code/geoson/build/_deps/json-src/include -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles/exe.dir/src/exe.cpp.o -c /doc/code/geoson/src/exe.cpp",
+  "file": "/doc/code/geoson/src/exe.cpp",
+  "output": "CMakeFiles/exe.dir/src/exe.cpp.o"
+}
+]
