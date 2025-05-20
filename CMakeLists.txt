@@ -17,7 +17,7 @@ set(params
     -Wno-reorder
 )
 
-option(GEOSON_BUILD_EXAMPLES "Build examples" ON)
+option(GEOSON_BUILD_EXAMPLES "Build examples" OFF)
 
 # --------------------------------------------------------------------------------------------------
 include(FetchContent)
