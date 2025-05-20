@@ -54,7 +54,6 @@ namespace geoson {
     struct Feature {
         ConcordGeometry geometry;
         std::unordered_map<std::string, std::string> properties;
-        std::optional<std::string> id;
     };
 
     /// The full parsed FeatureCollection, including optional "crs"
@@ -167,15 +166,9 @@ namespace geoson {
             // parse properties into map<string,string>
             auto props = parseProperties(feat.value("properties", json::object()));
 
-            // optional id → always as string
-            std::optional<std::string> id;
-            if (feat.contains("id")) {
-                id = feat.at("id").dump();
-            }
-
             // one entry per geometry
             for (auto &g : geoms) {
-                fc.features.push_back(Feature{std::move(g), props, id});
+                fc.features.push_back(Feature{std::move(g), props});
             }
         }
 

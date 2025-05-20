@@ -17,7 +17,7 @@ set(params
     -Wno-reorder
 )
 
-option(BUILD_EXAMPLES "Build examples" OFF)
+option(GEOSON_BUILD_EXAMPLES "Build examples" ON)
 
 # --------------------------------------------------------------------------------------------------
 include(FetchContent)
@@ -27,6 +27,7 @@ FetchContent_Declare(
   GIT_TAG        main
 )
 FetchContent_MakeAvailable(concord)
+include_directories(${CMAKE_INSTALL_INCLUDEDIR}/concord)
 
 FetchContent_Declare(
   pigment
@@ -43,6 +44,8 @@ FetchContent_MakeAvailable(json)
 
 # --------------------------------------------------------------------------------------------------
 add_library(${project_name} INTERFACE)
+# allow users to link to this target with `target_link_libraries(mytarget geoson::geoson)`
+add_library(${project_name}::${project_name} ALIAS ${project_name})
 target_include_directories(${project_name} INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -78,14 +81,14 @@ export(EXPORT ${project_name}Targets
 
 
 # --------------------------------------------------------------------------------------------------
-if(BUILD_EXAMPLES)
+if(GEOSON_BUILD_EXAMPLES)
   set(external_deps
     concord::concord
     pigment::pigment
     nlohmann_json::nlohmann_json
   )
   set(exe
-    examples/exe.cpp
+    examples/main.cpp
   )
   # ----------------------------------------------
   set(exec_names)
