@@ -1,5 +1,10 @@
 {
   "type": "FeatureCollection",
+  "properties": {
+      "crs": "EPSG:4326",
+      "datum": [52.0, 4.4, 0.0],
+      "heading": 0.0
+  },
   "features": [
     {
       "type": "Feature",

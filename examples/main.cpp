@@ -1,23 +1,26 @@
-#include "concord/types_basic.hpp"
 #include "geoson/parser.hpp"
-
+#include "geoson/writter.hpp"
 #include <iostream>
 
 int main() {
+    try {
+        // 1) Read your GeoJSON
+        auto fc = geoson::ReadFeatureCollection("misc/field4.geojson");
 
-    concord::Datum datum{/*lat=*/52.0, /*lon=*/4.4, /*alt=*/0.0};
+        // 2) Print what we got
+        std::cout << fc << "\n";
 
-    auto fc = geoson::ReadFeatureCollection("misc/wur.geojson", datum);
+        // 3) Tweak the datum (for example bump the latitude by +0.1°)
+        fc.datum.lat += 5.1;
+        std::cout << "After tweak, new datum is: " << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.datum.alt
+                  << "\n";
 
-    std::cout << fc.features.size() << " features\n" << std::endl;
-
-    for (auto const &f : fc.features) {
-        std::cout << "  properties: " << f.properties.size() << "\n";
-        auto &v = f.geometry;
-        if (auto *p = std::get_if<concord::Polygon>(&v)) {
-            std::cout << "    Polygon\n";
-        }
+        // 4) Save back out
+        geoson::WriteFeatureCollection(fc, "misc/field4.geojson");
+        std::cout << "Saved modified GeoJSON to misc/field4_modified.geojson\n";
+    } catch (std::exception &e) {
+        std::cerr << "ERROR: " << e.what() << "\n";
+        return 1;
     }
-
     return 0;
 }
