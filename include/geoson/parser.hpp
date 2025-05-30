@@ -9,10 +9,7 @@
 #include <variant>
 #include <vector>
 
-#include "concord/types_basic.hpp" // for concord::CRS, Datum, Euler
-#include "concord/types_line.hpp"
-#include "concord/types_path.hpp"
-#include "concord/types_polygon.hpp"
+#include "concord/concord.hpp" // for concord::CRS, Datum, Euler
 
 #include "geoson/types.hpp"
 

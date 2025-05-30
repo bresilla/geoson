@@ -1,5 +1,4 @@
-#include "geoson/parser.hpp"
-#include "geoson/writter.hpp"
+#include "geoson/geoson.hpp"
 #include <iostream>
 
 int main() {
