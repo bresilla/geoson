@@ -183,16 +183,16 @@ namespace geoson {
         for (auto const &f : fc.features) {
             auto &v = f.geometry;
             if (std::get_if<concord::Polygon>(&v)) {
-                std::cout << "  POLYGON\n";
+                os << "  POLYGON\n";
             } else if (std::get_if<concord::Line>(&v)) {
-                std::cout << "  LINE\n";
+                os << "  LINE\n";
             } else if (std::get_if<concord::Path>(&v)) {
-                std::cout << "  PATH\n";
+                os << "  PATH\n";
             } else if (std::get_if<concord::Point>(&v)) {
-                std::cout << "   POINT\n";
+                os << "   POINT\n";
             }
             if (f.properties.size() > 0)
-                std::cout << "    PROPS:" << f.properties.size() << "\n";
+                os << "    PROPS:" << f.properties.size() << "\n";
         }
 
         return os;
