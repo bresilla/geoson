@@ -8,9 +8,11 @@
 #include <vector>
 
 namespace geoson {
+    // Internal geometry representation: all coordinates are stored as Point (ENU/local system)
+    // Regardless of input CRS, coordinates are converted to local coordinate system during parsing
     using Geometry = std::variant<concord::Point, concord::Line, concord::Path, concord::Polygon>;
 
-    // Simple CRS representation since concord::CRS no longer exists
+    // Simple CRS representation - used for input parsing and output formatting
     enum class CRS { WGS, ENU };
 
     struct Feature {
@@ -19,10 +21,10 @@ namespace geoson {
     };
 
     struct FeatureCollection {
-        CRS crs;
+        CRS crs;            // Original CRS from input file (for reference/default output)
         concord::Datum datum;
         concord::Euler heading;
-        std::vector<Feature> features;
+        std::vector<Feature> features;  // All geometries stored in Point (ENU/local) coordinates
     };
 
 } // namespace geoson

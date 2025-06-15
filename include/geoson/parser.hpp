@@ -63,12 +63,14 @@ namespace geoson {
         double y = coords.at(1).get<double>();
         double z = coords.size() > 2 ? coords.at(2).get<double>() : 0.0;
 
+        // Internal representation is always in Point coordinates (ENU/local system)
         if (crs == geoson::CRS::ENU) {
             // ENU flavor: coordinates are already local x,y,z
             return concord::Point{x, y, z};
         } else {
             // WGS flavor: coordinates are lon,lat,alt - convert to ENU using datum
-            concord::WGS wgs{y, x, z}; // Note: WGS constructor is (lat, lon, alt)
+            // Note: WGS constructor is (lat, lon, alt), so swap x,y
+            concord::WGS wgs{y, x, z}; 
             concord::ENU enu = wgs.toENU(datum);
             return concord::Point{enu.x, enu.y, enu.z};
         }

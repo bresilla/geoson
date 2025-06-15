@@ -9,14 +9,15 @@
 namespace geoson {
 
     /// helper to turn a single Geometry into its GeoJSON object
-    inline nlohmann::json geometryToJson(Geometry const &geom, const concord::Datum &datum, geoson::CRS crs) {
-        // small helper to build coordinates based on CRS flavor
+    inline nlohmann::json geometryToJson(Geometry const &geom, const concord::Datum &datum, geoson::CRS outputCrs) {
+        // Helper to build coordinates based on desired output CRS
+        // Internal representation is always in Point coordinates (ENU/local system)
         auto ptCoords = [&](concord::Point const &p) {
-            if (crs == geoson::CRS::ENU) {
-                // ENU flavor: output coordinates directly as x,y,z
+            if (outputCrs == geoson::CRS::ENU) {
+                // ENU output: coordinates are already in local system, output directly as x,y,z
                 return nlohmann::json::array({p.x, p.y, p.z});
             } else {
-                // WGS flavor: convert Point to ENU with datum, then to WGS
+                // WGS output: convert Point to ENU with datum, then to WGS
                 concord::ENU enu{p, datum};
                 concord::WGS wgs = enu.toWGS();
                 return nlohmann::json::array({wgs.lon, wgs.lat, wgs.alt});
@@ -54,18 +55,18 @@ namespace geoson {
     }
 
     /// turn one Feature into its GeoJSON object
-    inline nlohmann::json featureToJson(Feature const &f, const concord::Datum &datum, geoson::CRS crs) {
+    inline nlohmann::json featureToJson(Feature const &f, const concord::Datum &datum, geoson::CRS outputCrs) {
         nlohmann::json j;
         j["type"] = "Feature";
         j["properties"] = nlohmann::json::object();
         for (auto const &kv : f.properties)
             j["properties"][kv.first] = kv.second;
-        j["geometry"] = geometryToJson(f.geometry, datum, crs);
+        j["geometry"] = geometryToJson(f.geometry, datum, outputCrs);
         return j;
     }
 
-    /// serialize a full FeatureCollection to GeoJSON
-    inline nlohmann::json toJson(FeatureCollection const &fc) {
+    /// serialize a full FeatureCollection to GeoJSON with specified output CRS
+    inline nlohmann::json toJson(FeatureCollection const &fc, geoson::CRS outputCrs) {
         nlohmann::json j;
         j["type"] = "FeatureCollection";
 
@@ -74,8 +75,8 @@ namespace geoson {
             auto &P = j["properties"];
             P = nlohmann::json::object();
 
-            // crs → string
-            switch (fc.crs) {
+            // crs → string (based on output CRS, not internal storage)
+            switch (outputCrs) {
             case geoson::CRS::WGS:
                 P["crs"] = "EPSG:4326";
                 break;
@@ -91,21 +92,31 @@ namespace geoson {
             P["heading"] = fc.heading.yaw;
         }
 
-        // features
+        // features (use output CRS for coordinate conversion)
         j["features"] = nlohmann::json::array();
         for (auto const &f : fc.features)
-            j["features"].push_back(featureToJson(f, fc.datum, fc.crs));
+            j["features"].push_back(featureToJson(f, fc.datum, outputCrs));
 
         return j;
     }
 
-    /// write GeoJSON out to disk (pretty‐printed)
-    inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath) {
-        auto j = toJson(fc);
+    /// serialize a full FeatureCollection to GeoJSON (uses the original CRS from parsing)
+    inline nlohmann::json toJson(FeatureCollection const &fc) {
+        return toJson(fc, fc.crs);
+    }
+
+    /// write GeoJSON out to disk with specified output CRS (pretty‐printed)
+    inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath, geoson::CRS outputCrs) {
+        auto j = toJson(fc, outputCrs);
         std::ofstream ofs(outPath);
         if (!ofs)
             throw std::runtime_error("Cannot open for write: " + outPath.string());
         ofs << j.dump(2) << "\n";
+    }
+
+    /// write GeoJSON out to disk (pretty‐printed) - uses original CRS from parsing
+    inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath) {
+        WriteFeatureCollection(fc, outPath, fc.crs);
     }
 
 } // namespace geoson
