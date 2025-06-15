@@ -124,7 +124,6 @@ TEST_CASE("Writer - featureToJson") {
 }
 
 TEST_CASE("Writer - toJson FeatureCollection") {
-    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -151,9 +150,9 @@ TEST_CASE("Writer - toJson FeatureCollection") {
     lineProps["name"] = "test_line";
     features.emplace_back(geoson::Feature{line, lineProps});
 
-    geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+    geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
-    auto json = geoson::toJson(fc);
+    auto json = geoson::toJson(fc, geoson::CRS::WGS); // Test WGS output specifically
 
     SUBCASE("Top-level structure") {
         CHECK(json["type"] == "FeatureCollection");
@@ -191,7 +190,6 @@ TEST_CASE("Writer - toJson FeatureCollection") {
 }
 
 TEST_CASE("Writer - toJson with ENU CRS") {
-    geoson::CRS crs = geoson::CRS::ENU;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 1.5};
 
@@ -201,15 +199,14 @@ TEST_CASE("Writer - toJson with ENU CRS") {
     std::unordered_map<std::string, std::string> props;
     features.emplace_back(geoson::Feature{point, props});
 
-    geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+    geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
-    auto json = geoson::toJson(fc);
+    auto json = geoson::toJson(fc, geoson::CRS::ENU); // Explicit ENU output
 
     CHECK(json["properties"]["crs"] == "ENU");
 }
 
 TEST_CASE("Writer - WriteFeatureCollection") {
-    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -221,12 +218,12 @@ TEST_CASE("Writer - WriteFeatureCollection") {
     props["name"] = "test_point";
     features.emplace_back(geoson::Feature{point, props});
 
-    geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+    geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
     const std::filesystem::path test_file = "/tmp/test_output.geojson";
 
     SUBCASE("Write and read back") {
-        geoson::WriteFeatureCollection(fc, test_file);
+        geoson::WriteFeatureCollection(fc, test_file, geoson::CRS::WGS); // Explicit WGS output
 
         // Verify file exists
         CHECK(std::filesystem::exists(test_file));

@@ -158,7 +158,6 @@ namespace geoson {
         concord::Euler euler{0.0, 0.0, yaw};
 
         FeatureCollection fc;
-        fc.crs = crsVal;
         fc.datum = d;
         fc.heading = euler;
         fc.features.reserve(fc_json["features"].size());
@@ -178,16 +177,7 @@ namespace geoson {
     // ––– pretty-print FeatureCollection header –––
 
     inline std::ostream &operator<<(std::ostream &os, FeatureCollection const &fc) {
-        os << "CRS: ";
-        switch (fc.crs) {
-        case geoson::CRS::WGS:
-            os << "WGS";
-            break;
-        case geoson::CRS::ENU:
-            os << "ENU";
-            break;
-        }
-        os << "\nDATUM: " << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.datum.alt << "\n"
+        os << "DATUM: " << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.datum.alt << "\n"
            << "HEADING: " << fc.heading.yaw << "\n";
         os << "FEATURES: " << fc.features.size() << "\n";
 

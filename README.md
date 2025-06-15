@@ -19,11 +19,12 @@ Geoson is a high-performance C++ library that provides a clean interface for wor
 - **Multi-geometries**: MultiPoint, MultiLineString, MultiPolygon
 - **GeometryCollection**: Nested geometry collections
 
-### 🌍 **Coordinate Reference Systems & Multi-Flavor Support**
+### 🌍 **Coordinate Reference Systems & Internal Representation**
 - **WGS84** (EPSG:4326) - Global geodetic coordinates (latitude, longitude, altitude)
 - **ENU** (East-North-Up) - Local coordinate systems relative to a datum point
 - **Automatic CRS Detection**: Parses CRS from GeoJSON properties
-- **Dual-Flavor I/O**: Read and write in both WGS84 and ENU coordinate systems
+- **Unified Internal Storage**: All coordinates stored internally as Point (ENU/local) coordinates
+- **Flexible Output**: Write in either WGS84 or ENU format regardless of input format
 - **Intelligent Coordinate Conversion**: Seamless transformation between coordinate systems
 
 ### 📍 **Datum-Centric Spatial Handling**
@@ -34,6 +35,7 @@ Geoson is a high-performance C++ library that provides a clean interface for wor
 - **Bi-directional Conversion**: WGS ↔ ENU transformations preserve spatial relationships
 
 ### 🔧 **Developer Experience**
+- **Convenient Aliases**: Simple `geoson::read()` and `geoson::write()` functions
 - **Pretty Printing**: Human-readable output for debugging
 - **Error Handling**: Comprehensive error reporting with context
 - **File I/O**: Direct file reading/writing with path validation
@@ -44,21 +46,51 @@ Geoson is a high-performance C++ library that provides a clean interface for wor
 - [Concord](https://github.com/smolfetch/concord) - Geometry and coordinate system handling
 - [JSON for Modern C++](https://github.com/nlohmann/json) - JSON parsing and serialization
 
-## CRS-Aware Parsing and Writing
+## Internal Representation & CRS Handling
 
-Geoson supports **two distinct GeoJSON flavors** based on coordinate reference systems, with the **datum playing a critical role** in coordinate transformations:
+Geoson uses a **unified internal representation** where all coordinates are stored as Point (ENU/local) coordinates, regardless of the input format. This design provides consistency and efficiency while allowing flexible input/output formats.
 
-### WGS84 Flavor (EPSG:4326)
-- **Global coordinates**: Latitude, longitude, altitude in decimal degrees
-- **Standard GeoJSON**: Follows RFC 7946 specification exactly  
-- **Datum as origin**: The datum serves as the reference point for any local transformations
-- **Direct usage**: Coordinates are used as-is for global positioning
+### Key Principles
 
-### ENU Flavor (East-North-Up)
-- **Local coordinates**: Relative East, North, Up distances in meters
-- **Datum-centered**: All coordinates are relative to the datum point (lat, lon, alt)
-- **High precision**: Ideal for surveying, robotics, and local area applications
-- **Meter-based**: Direct distance measurements without geodetic calculations
+1. **Parse Once, Store Consistently**: All input coordinates (WGS or ENU) are converted to Point (local) coordinates during parsing
+2. **Internal Uniformity**: All geometry operations work with the same coordinate system internally
+3. **Output Flexibility**: Choose WGS84 or ENU format when writing, independent of input format
+4. **Datum-Centric**: The datum serves as the anchor point for all coordinate transformations
+
+### Parsing Behavior
+
+**Input Processing:**
+- **WGS84 input** → Converted to Point (local/ENU) coordinates using datum → Stored internally
+- **ENU input** → Used directly as Point (local) coordinates → Stored internally  
+- **Result**: All geometries stored in consistent Point coordinate system
+
+### Writing Behavior
+
+**Output Processing:**
+- **Internal Point coordinates** → Convert to chosen output format → Write to file
+- **WGS84 output**: Point coordinates converted to lat/lon/alt using datum
+- **ENU output**: Point coordinates written directly as local x/y/z
+- **Default behavior**: Uses original input CRS format if no output CRS specified
+
+### Coordinate System Flow
+
+```
+┌─────────────┐    Parse     ┌──────────────────┐    Write      ┌─────────────┐
+│ WGS84 Input │ ────────────→│ Point (Internal) │ ────────────→ │ WGS84 Output│
+│ [lon,lat,alt]│              │ [x, y, z]        │               │ [lon,lat,alt]│
+└─────────────┘              └──────────────────┘               └─────────────┘
+                                       │
+┌─────────────┐    Parse               │                 Write   ┌─────────────┐
+│ ENU Input   │ ──────────────────────→│ ←────────────────────── │ ENU Output  │
+│ [x, y, z]   │                        │                         │ [x, y, z]   │
+└─────────────┘                        │                         └─────────────┘
+                                       │
+                             ┌─────────▼─────────┐
+                             │ All Operations    │
+                             │ Work Here         │
+                             │ (Point coords)    │
+                             └───────────────────┘
+```
 
 ### The Critical Role of Datum
 
@@ -77,41 +109,20 @@ concord::Point wgs_point{concord::WGS{52.1, 5.1, 10.0}, datum/* converts to ENU 
 concord::Point enu_point{1000.0, 500.0, 10.0};
 ```
 
-### Parsing Behavior
-
-When **reading** GeoJSON files, the coordinate interpretation depends on the `crs` property:
+### Example Workflow
 
 ```cpp
-// Reading WGS84 GeoJSON (crs: "EPSG:4326")
-// Coordinates [5.1, 52.1, 10.0] are interpreted as:
-// → longitude=5.1°, latitude=52.1°, altitude=10.0m
-// → Converted to ENU relative to datum during parsing
-auto wgs_fc = geoson::ReadFeatureCollection("global_data.geojson");
+// Step 1: Read WGS84 GeoJSON - coordinates automatically converted to Point (internal)
+auto fc = geoson::read("global_data.geojson");  // Input: WGS84 coordinates
+// Internal storage: All coordinates now in Point (local) format
 
-// Reading ENU GeoJSON (crs: "ENU") 
-// Coordinates [1000.0, 500.0, 10.0] are interpreted as:
-// → east=1000m, north=500m, up=10.0m (relative to datum)
-// → Used directly as local coordinates
-auto enu_fc = geoson::ReadFeatureCollection("local_survey.geojson");
-```
+// Step 2: All processing works with consistent Point coordinates
+// ... spatial operations, calculations, modifications ...
 
-### Writing Behavior
-
-When **writing** GeoJSON files, you specify the desired output flavor:
-
-```cpp
-// Same internal geometry data...
-geoson::FeatureCollection fc{geoson::CRS::WGS, datum, heading, features};
-
-// Write as WGS84 GeoJSON (global coordinates)
-// ENU coordinates are converted back to lat/lon/alt
-geoson::WriteFeatureCollection(fc, "output_global.geojson");
-// Output: [5.1, 52.1, 10.0] (longitude, latitude, altitude)
-
-// Write as ENU GeoJSON (local coordinates) 
-fc.crs = geoson::CRS::ENU;
-geoson::WriteFeatureCollection(fc, "output_local.geojson");
-// Output: [1000.0, 500.0, 10.0] (east, north, up relative to datum)
+// Step 3: Write in different formats
+geoson::write(fc, "output_wgs84.geojson", geoson::CRS::WGS);  // Output: WGS84 format
+geoson::write(fc, "output_enu.geojson", geoson::CRS::ENU);    // Output: ENU format  
+geoson::write(fc, "output_original.geojson");                  // Output: Original input format
 ```
 
 ### Datum Precision Impact
@@ -131,20 +142,24 @@ concord::Datum regional_datum{52.0, 5.0, 0.0};
 // Suitable for: city-level mapping, general GIS applications
 ```
 
-### Multi-Flavor Workflow Example
+### Internal Representation Workflow Example
 
 ```cpp
-// 1. Read survey data (ENU flavor - high precision local coordinates)
-auto survey_data = geoson::ReadFeatureCollection("survey_enu.geojson");
+// 1. Read survey data (any input format - WGS or ENU)
+auto survey_data = geoson::read("survey_data.geojson");
+// Internal: All coordinates now stored as Point (local) coordinates
 
 // 2. Process with local algorithms (distances, areas, etc.)
-// ... spatial processing on ENU coordinates ...
+// All operations work with consistent Point coordinate system
+// ... spatial processing on internal Point coordinates ...
 
-// 3. Export for global GIS (WGS84 flavor - standard GeoJSON)
-survey_data.crs = geoson::CRS::WGS;  // Switch output flavor
-geoson::WriteFeatureCollection(survey_data, "for_gis_global.geojson");
+// 3. Export in multiple formats as needed
+geoson::write(survey_data, "for_gis_wgs84.geojson", geoson::CRS::WGS);  // Global GIS
+geoson::write(survey_data, "for_cad_enu.geojson", geoson::CRS::ENU);    // CAD software
+geoson::write(survey_data, "archive_original.geojson");                  // Original format
 
-// 4. The datum ensures perfect coordinate transformation between flavors
+// 4. The datum ensures perfect coordinate transformation between formats
+// Internal Point representation provides consistency across all operations
 ```
 
 ### Best Practices
@@ -156,7 +171,7 @@ geoson::WriteFeatureCollection(survey_data, "for_gis_global.geojson");
 
 ## Quick Start
 
-### Basic Usage
+### Simple API with Convenient Aliases
 
 ```cpp
 #include "geoson/geoson.hpp"
@@ -164,27 +179,67 @@ geoson::WriteFeatureCollection(survey_data, "for_gis_global.geojson");
 
 int main() {
     try {
-        // Read GeoJSON file (automatically detects WGS84 or ENU flavor)
-        auto fc = geoson::ReadFeatureCollection("data.geojson");
+        // Read GeoJSON file (automatically converts to internal Point coordinates)
+        auto fc = geoson::read("data.geojson");
         
         // Print summary information
         std::cout << fc << std::endl;
         
-        // Modify spatial reference (affects all coordinate transformations)
+        // Modify spatial reference (affects coordinate transformations)
         fc.datum.lat += 0.1;  // Shift datum north by 0.1 degrees
         fc.heading.yaw = 45.0; // Set heading to 45 degrees
         
-        // Save in original flavor
-        geoson::WriteFeatureCollection(fc, "modified.geojson");
-        
-        // Convert to different flavor for export
-        fc.crs = geoson::CRS::WGS;  // Force WGS84 output
-        geoson::WriteFeatureCollection(fc, "modified_global.geojson");
+        // Write in different formats using convenient aliases
+        geoson::write(fc, "output_wgs84.geojson", geoson::CRS::WGS);  // WGS84 format
+        geoson::write(fc, "output_enu.geojson", geoson::CRS::ENU);    // ENU format  
+        geoson::write(fc, "output_original.geojson");                  // Original format
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
     }
 }
+```
+
+### Advanced Usage (Full Function Names)
+
+```cpp
+// Alternative: Use full function names for explicit control
+auto fc = geoson::ReadFeatureCollection("data.geojson");
+geoson::WriteFeatureCollection(fc, "output.geojson", geoson::CRS::WGS);
+```
+
+## API Reference
+
+### Convenient Aliases
+
+For streamlined usage, geoson provides simple aliases:
+
+```cpp
+// Reading
+auto fc = geoson::read("input.geojson");
+
+// Writing with specific output CRS
+geoson::write(fc, "output.geojson", geoson::CRS::WGS);  // WGS84 output
+geoson::write(fc, "output.geojson", geoson::CRS::ENU);  // ENU output
+
+// Writing with original input CRS
+geoson::write(fc, "output.geojson");  // Uses original input format
+```
+
+### Full Function Names
+
+For explicit control or when preferred:
+
+```cpp
+// Reading
+auto fc = geoson::ReadFeatureCollection("input.geojson");
+
+// Writing with specific output CRS  
+geoson::WriteFeatureCollection(fc, "output.geojson", geoson::CRS::WGS);
+geoson::WriteFeatureCollection(fc, "output.geojson", geoson::CRS::ENU);
+
+// Writing with original input CRS
+geoson::WriteFeatureCollection(fc, "output.geojson");
 ```
 
 ### Creating Geometries with CRS Awareness
@@ -250,33 +305,33 @@ polyProps["name"] = "Survey Plot";
 polyProps["area_m2"] = "10000";  // 100m x 100m = 10,000 m²
 features.emplace_back(geoson::Feature{polygon, polyProps});
 
-// Create feature collection
+// Create feature collection  
 geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
 
-// Write in WGS84 flavor (global coordinates)
-geoson::WriteFeatureCollection(fc, "global_output.geojson");
+// Write in WGS84 format (global coordinates) - using convenient alias
+geoson::write(fc, "global_output.geojson", geoson::CRS::WGS);
 // Coordinates like [0.0, 0.0, 0.0] become [5.0, 52.0, 0.0] (datum location)
 
-// Write in ENU flavor (local coordinates)
-fc.crs = geoson::CRS::ENU;
-geoson::WriteFeatureCollection(fc, "local_output.geojson");  
+// Write in ENU format (local coordinates) - using convenient alias  
+geoson::write(fc, "local_output.geojson", geoson::CRS::ENU);
 // Coordinates remain as [0.0, 0.0, 0.0] (relative to datum)
 ```
 
 ### Coordinate System Conversion Examples
 
 ```cpp
-// Reading and converting between flavors
-auto global_data = geoson::ReadFeatureCollection("global.geojson");  // WGS84 input
-// Internal processing uses ENU coordinates relative to datum
+// Reading and converting between formats using convenient aliases
+auto global_data = geoson::read("global.geojson");  // Any input format
+// Internal: All coordinates stored as Point (local) coordinates
 
-// Export as local survey data
-global_data.crs = geoson::CRS::ENU;
-geoson::WriteFeatureCollection(global_data, "local_survey.geojson"); // ENU output
+// Export as WGS84 format
+geoson::write(global_data, "output_wgs84.geojson", geoson::CRS::WGS);
 
-// The datum acts as the conversion anchor:
-// - WGS input [5.1, 52.1, 10.0] → ENU internal [~11132m, ~11119m, 10.0m] → ENU output [11132, 11119, 10]  
-// - ENU input [1000, 500, 10] → ENU internal [1000, 500, 10] → WGS output [~5.014, ~52.005, 10]
+// Export as ENU format  
+geoson::write(global_data, "output_enu.geojson", geoson::CRS::ENU);
+
+// Export in original input format
+geoson::write(global_data, "output_original.geojson");
 ```
 
 ### Working with Properties and CRS Detection
@@ -392,26 +447,51 @@ make build
 make test
 ```
 
-## Use Cases by CRS Flavor
+## Use Cases and Benefits
 
-### WGS84 Flavor - Global Applications
-- **Web mapping**: Direct compatibility with web maps (Leaflet, Google Maps)
-- **GIS integration**: Standard format for QGIS, ArcGIS, PostGIS
-- **Data sharing**: Universal format for geographic data exchange
-- **GPS applications**: Direct use of GPS coordinates without conversion
+### Internal Point Representation Benefits
+- **Consistency**: All geometry operations work with the same coordinate system
+- **Performance**: No coordinate conversion needed during processing
+- **Precision**: Avoids repeated coordinate transformations that can accumulate errors
+- **Simplicity**: Single coordinate system for all internal calculations
 
-### ENU Flavor - Local High-Precision Applications
-- **Construction & surveying**: Millimeter-precision local measurements
-- **Robotics**: Path planning and navigation in local coordinate frames
-- **Precision agriculture**: Field operations with centimeter accuracy
-- **Engineering**: CAD integration and local coordinate system alignment
+### Input/Output Flexibility
+- **WGS84 Input**: Read standard GeoJSON files from web maps, GPS devices, GIS software
+- **ENU Input**: Read high-precision survey data, CAD files, robotics datasets
+- **WGS84 Output**: Export for web mapping, GIS integration, data sharing
+- **ENU Output**: Export for CAD software, robotics, precision applications
+
+### Workflow Applications
+
+#### Global-to-Local Processing
+```cpp
+auto global_data = geoson::read("gps_tracks.geojson");        // WGS84 input
+// ... process using local Point coordinates ...
+geoson::write(global_data, "robot_path.geojson", geoson::CRS::ENU);  // ENU output
+```
+
+#### Local-to-Global Sharing  
+```cpp
+auto survey_data = geoson::read("field_survey.geojson");      // ENU input
+// ... analyze using local Point coordinates ...
+geoson::write(survey_data, "public_map.geojson", geoson::CRS::WGS);  // WGS84 output
+```
+
+#### Multi-Format Export
+```cpp
+auto data = geoson::read("source.geojson");                   // Any input format
+geoson::write(data, "for_web.geojson", geoson::CRS::WGS);     // Web mapping
+geoson::write(data, "for_cad.geojson", geoson::CRS::ENU);     // CAD integration
+geoson::write(data, "archive.geojson");                       // Original format
+```
 
 ### Performance Considerations
 
-- **Memory efficiency**: Internal ENU storage minimizes coordinate conversion overhead
+- **Memory efficiency**: Single internal coordinate system reduces storage overhead
+- **Processing speed**: No coordinate conversion during geometry operations
 - **Precision preservation**: Datum-based transformations maintain spatial accuracy
-- **Conversion cost**: WGS↔ENU transformations are computationally lightweight
-- **File size**: ENU coordinates often have fewer decimal places (smaller files)
+- **Conversion cost**: Input/output transformations are performed only when needed
+- **Consistency**: All calculations use the same coordinate reference frame
 
 ## Acknowledgements
 

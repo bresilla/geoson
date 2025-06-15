@@ -91,7 +91,6 @@ TEST_CASE("Types - Feature") {
 }
 
 TEST_CASE("Types - FeatureCollection") {
-    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -118,9 +117,9 @@ TEST_CASE("Types - FeatureCollection") {
     lineProps["name"] = "test_line";
     features.emplace_back(geoson::Feature{line, lineProps});
 
-    geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+    geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
-    CHECK(fc.crs == geoson::CRS::WGS);
+    // Note: Internal representation is always Point coordinates, no CRS stored
     CHECK(fc.datum.lat == doctest::Approx(52.0));
     CHECK(fc.datum.lon == doctest::Approx(5.0));
     CHECK(fc.datum.alt == doctest::Approx(0.0));

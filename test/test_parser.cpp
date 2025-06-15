@@ -204,7 +204,7 @@ TEST_CASE("Parser - File operations") {
 
         auto fc = geoson::ReadFeatureCollection(test_file);
 
-        CHECK(fc.crs == geoson::CRS::WGS);
+        // Note: Internal representation is always Point coordinates, no CRS stored
         CHECK(fc.datum.lat == doctest::Approx(52.0));
         CHECK(fc.datum.lon == doctest::Approx(5.0));
         CHECK(fc.datum.alt == doctest::Approx(0.0));

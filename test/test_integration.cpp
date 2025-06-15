@@ -9,7 +9,6 @@
 
 TEST_CASE("Integration - Round-trip conversion") {
     // Create original feature collection
-    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -60,7 +59,7 @@ TEST_CASE("Integration - Round-trip conversion") {
     polygonProps["name"] = "test_polygon";
     features.emplace_back(geoson::Feature{polygon, polygonProps});
 
-    geoson::FeatureCollection original{crs, datum, heading, std::move(features)};
+    geoson::FeatureCollection original{datum, heading, std::move(features)};
 
     // Write to file
     const std::filesystem::path test_file = "/tmp/round_trip_test.geojson";
@@ -70,7 +69,7 @@ TEST_CASE("Integration - Round-trip conversion") {
     auto loaded = geoson::ReadFeatureCollection(test_file);
 
     // Verify the content matches
-    CHECK(loaded.crs == original.crs);
+    // Note: No CRS comparison since internal representation is always Point coordinates
     CHECK(loaded.datum.lat == doctest::Approx(original.datum.lat));
     CHECK(loaded.datum.lon == doctest::Approx(original.datum.lon));
     CHECK(loaded.datum.alt == doctest::Approx(original.datum.alt));
@@ -85,7 +84,7 @@ TEST_CASE("Integration - Read existing GeoJSON file") {
     // This test assumes there's a test file in misc/
     auto fc = geoson::ReadFeatureCollection("/doc/code/geoson/misc/field4.geojson");
 
-    CHECK(fc.crs == geoson::CRS::WGS);
+    // Note: Internal representation is always Point coordinates, no CRS stored
     CHECK(fc.datum.lat == doctest::Approx(67.3)); // File was modified by main example
     CHECK(fc.datum.lon == doctest::Approx(4.4));
     CHECK(fc.datum.alt == doctest::Approx(50));
@@ -122,7 +121,6 @@ TEST_CASE("Integration - CRS flavor handling") {
     concord::Euler heading{0.0, 0.0, 1.5};
 
     SUBCASE("WGS flavor - coordinates should be converted") {
-        geoson::CRS crs = geoson::CRS::WGS;
         std::vector<geoson::Feature> features;
 
         // Create point using WGS coordinates -> ENU -> Point
@@ -133,10 +131,10 @@ TEST_CASE("Integration - CRS flavor handling") {
         props["name"] = "test_point";
         features.emplace_back(geoson::Feature{point, props});
 
-        geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+        geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
         // Convert to JSON (WGS output)
-        auto json = geoson::toJson(fc);
+        auto json = geoson::toJson(fc, geoson::CRS::WGS);
 
         // Check that coordinates are converted back to WGS format
         CHECK(json["properties"]["crs"] == "EPSG:4326");
@@ -147,7 +145,6 @@ TEST_CASE("Integration - CRS flavor handling") {
     }
 
     SUBCASE("ENU flavor - coordinates should be direct") {
-        geoson::CRS crs = geoson::CRS::ENU;
         std::vector<geoson::Feature> features;
 
         // Create point with direct ENU coordinates
@@ -156,10 +153,10 @@ TEST_CASE("Integration - CRS flavor handling") {
         props["name"] = "test_point";
         features.emplace_back(geoson::Feature{point, props});
 
-        geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+        geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
         // Convert to JSON (ENU output)
-        auto json = geoson::toJson(fc);
+        auto json = geoson::toJson(fc, geoson::CRS::ENU);
 
         // Check that coordinates are output directly
         CHECK(json["properties"]["crs"] == "ENU");

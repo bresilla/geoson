@@ -100,8 +100,10 @@ namespace geoson {
         return j;
     }
 
-    /// serialize a full FeatureCollection to GeoJSON (uses the original CRS from parsing)
-    inline nlohmann::json toJson(FeatureCollection const &fc) { return toJson(fc, fc.crs); }
+    /// serialize a full FeatureCollection to GeoJSON (defaults to ENU output format)
+    inline nlohmann::json toJson(FeatureCollection const &fc) { 
+        return toJson(fc, geoson::CRS::ENU); 
+    }
 
     /// write GeoJSON out to disk with specified output CRS (pretty‐printed)
     inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath,
@@ -113,9 +115,9 @@ namespace geoson {
         ofs << j.dump(2) << "\n";
     }
 
-    /// write GeoJSON out to disk (pretty‐printed) - uses original CRS from parsing
+    /// write GeoJSON out to disk (pretty‐printed) - defaults to ENU output format
     inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath) {
-        WriteFeatureCollection(fc, outPath, fc.crs);
+        WriteFeatureCollection(fc, outPath, geoson::CRS::ENU);
     }
 
 } // namespace geoson

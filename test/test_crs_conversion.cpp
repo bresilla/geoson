@@ -29,7 +29,7 @@ TEST_CASE("CRS conversion during output") {
 
         // Check that we parsed correctly
         CHECK(fc.features.size() == 1);
-        CHECK(fc.crs == geoson::CRS::WGS);
+        // Note: Internal representation is always Point (ENU) coordinates, no CRS stored
 
         // Internal representation should be in Point coordinates
         auto *point = std::get_if<concord::Point>(&fc.features[0].geometry);
@@ -48,12 +48,12 @@ TEST_CASE("CRS conversion during output") {
         // Test output in WGS format
         geoson::write(fc, "test_output_wgs.geojson", geoson::CRS::WGS);
         auto fc_wgs = geoson::read("test_output_wgs.geojson");
-        CHECK(fc_wgs.crs == geoson::CRS::WGS);
+        // Note: Internal representation is always Point coordinates, no CRS stored
 
         // Test output in ENU format
         geoson::write(fc, "test_output_enu.geojson", geoson::CRS::ENU);
         auto fc_enu = geoson::read("test_output_enu.geojson");
-        CHECK(fc_enu.crs == geoson::CRS::ENU);
+        // Note: Internal representation is always Point coordinates, no CRS stored
 
         // Both should have the same internal representation after parsing
         auto *point_wgs = std::get_if<concord::Point>(&fc_wgs.features[0].geometry);

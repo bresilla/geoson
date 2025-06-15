@@ -226,12 +226,11 @@ TEST_CASE("Error Handling - File I/O errors") {
     }
 
     SUBCASE("WriteFeatureCollection - invalid directory") {
-        geoson::CRS crs = geoson::CRS::WGS;
         concord::Datum datum{52.0, 5.0, 0.0};
         concord::Euler heading{0.0, 0.0, 0.0};
         std::vector<geoson::Feature> features;
 
-        geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+        geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
         CHECK_THROWS_WITH(geoson::WriteFeatureCollection(fc, "/nonexistent/directory/file.geojson"),
                           doctest::Contains("Cannot open for write"));
