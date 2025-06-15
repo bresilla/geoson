@@ -4,7 +4,13 @@
 Geoson
 ===
 
-A modern C++20 library for reading, writing, and manipulating GeoJSON files with type-safe geometry handling.
+A modern C++20 library for reading, writing, and manipulating GeoJSON files with type-saf// Export in multiple formats as needed
+geoson::write(survey_data, "for_gis_wgs84.geojson", geoson::CRS::WGS);  // Global GIS
+geoson::write(survey_data, "for_cad_enu.geojson", geoson::CRS::ENU);    // CAD software
+geoson::write(survey_data, "archive_default.geojson");                  // ENU format (default)
+
+// 4. The datum ensures perfect coordinate transformation between formats
+// Internal Point representation provides consistency across all operationstry handling.
 
 ## Overview
 
@@ -48,14 +54,15 @@ Geoson is a high-performance C++ library that provides a clean interface for wor
 
 ## Internal Representation & CRS Handling
 
-Geoson uses a **unified internal representation** where all coordinates are stored as Point (ENU/local) coordinates, regardless of the input format. This design provides consistency and efficiency while allowing flexible input/output formats.
+Geoson uses a **unified internal representation** where all coordinates are stored as Point (ENU/local) coordinates, regardless of the input format. The CRS is only relevant during input parsing and output formatting - not for internal storage.
 
 ### Key Principles
 
 1. **Parse Once, Store Consistently**: All input coordinates (WGS or ENU) are converted to Point (local) coordinates during parsing
 2. **Internal Uniformity**: All geometry operations work with the same coordinate system internally
-3. **Output Flexibility**: Choose WGS84 or ENU format when writing, independent of input format
-4. **Datum-Centric**: The datum serves as the anchor point for all coordinate transformations
+3. **No CRS Storage**: FeatureCollection doesn't store original CRS since internal representation is always Point coordinates
+4. **Output Flexibility**: Choose WGS84 or ENU format when writing, independent of input format
+5. **Datum-Centric**: The datum serves as the anchor point for all coordinate transformations
 
 ### Parsing Behavior
 
@@ -70,7 +77,7 @@ Geoson uses a **unified internal representation** where all coordinates are stor
 - **Internal Point coordinates** → Convert to chosen output format → Write to file
 - **WGS84 output**: Point coordinates converted to lat/lon/alt using datum
 - **ENU output**: Point coordinates written directly as local x/y/z
-- **Default behavior**: Uses original input CRS format if no output CRS specified
+- **Default behavior**: ENU output (matches internal representation)
 
 ### Coordinate System Flow
 
@@ -84,11 +91,12 @@ Geoson uses a **unified internal representation** where all coordinates are stor
 │ ENU Input   │ ──────────────────────→│ ←────────────────────── │ ENU Output  │
 │ [x, y, z]   │                        │                         │ [x, y, z]   │
 └─────────────┘                        │                         └─────────────┘
-                                       │
+                                       │ (Default)
                              ┌─────────▼─────────┐
                              │ All Operations    │
                              │ Work Here         │
                              │ (Point coords)    │
+                             │ NO CRS STORED     │
                              └───────────────────┘
 ```
 
@@ -114,15 +122,15 @@ concord::Point enu_point{1000.0, 500.0, 10.0};
 ```cpp
 // Step 1: Read WGS84 GeoJSON - coordinates automatically converted to Point (internal)
 auto fc = geoson::read("global_data.geojson");  // Input: WGS84 coordinates
-// Internal storage: All coordinates now in Point (local) format
+// Internal storage: All coordinates now in Point (local) format, no CRS stored
 
 // Step 2: All processing works with consistent Point coordinates
 // ... spatial operations, calculations, modifications ...
 
-// Step 3: Write in different formats
+// Step 3: Write in different formats (choose output CRS at write time)
 geoson::write(fc, "output_wgs84.geojson", geoson::CRS::WGS);  // Output: WGS84 format
 geoson::write(fc, "output_enu.geojson", geoson::CRS::ENU);    // Output: ENU format  
-geoson::write(fc, "output_original.geojson");                  // Output: Original input format
+geoson::write(fc, "output_default.geojson");                  // Output: ENU format (default)
 ```
 
 ### Datum Precision Impact
@@ -192,7 +200,7 @@ int main() {
         // Write in different formats using convenient aliases
         geoson::write(fc, "output_wgs84.geojson", geoson::CRS::WGS);  // WGS84 format
         geoson::write(fc, "output_enu.geojson", geoson::CRS::ENU);    // ENU format  
-        geoson::write(fc, "output_original.geojson");                  // Original format
+        geoson::write(fc, "output_default.geojson");                  // ENU format (default)
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
@@ -223,7 +231,7 @@ geoson::write(fc, "output.geojson", geoson::CRS::WGS);  // WGS84 output
 geoson::write(fc, "output.geojson", geoson::CRS::ENU);  // ENU output
 
 // Writing with original input CRS
-geoson::write(fc, "output.geojson");  // Uses original input format
+geoson::write(fc, "output.geojson");  // Uses ENU format (internal representation)
 ```
 
 ### Full Function Names
@@ -238,7 +246,7 @@ auto fc = geoson::ReadFeatureCollection("input.geojson");
 geoson::WriteFeatureCollection(fc, "output.geojson", geoson::CRS::WGS);
 geoson::WriteFeatureCollection(fc, "output.geojson", geoson::CRS::ENU);
 
-// Writing with original input CRS
+// Writing with ENU format (default)
 geoson::WriteFeatureCollection(fc, "output.geojson");
 ```
 
@@ -305,8 +313,8 @@ polyProps["name"] = "Survey Plot";
 polyProps["area_m2"] = "10000";  // 100m x 100m = 10,000 m²
 features.emplace_back(geoson::Feature{polygon, polyProps});
 
-// Create feature collection  
-geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+// Create feature collection (no CRS stored - always internal Point coordinates)
+geoson::FeatureCollection fc{datum, heading, std::move(features)};
 
 // Write in WGS84 format (global coordinates) - using convenient alias
 geoson::write(fc, "global_output.geojson", geoson::CRS::WGS);
@@ -363,8 +371,8 @@ for (const auto& feature : fc.features) {
     }
 }
 
-// Check the FeatureCollection's CRS and datum
-std::cout << "Collection CRS: " << (fc.crs == geoson::CRS::WGS ? "WGS84" : "ENU") << std::endl;
+// Check the FeatureCollection's datum (no CRS stored internally)
+std::cout << "Collection stores Point coordinates internally (no CRS)" << std::endl;
 std::cout << "Datum: [" << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.datum.alt << "]" << std::endl;
 ```
 
@@ -380,7 +388,7 @@ std::cout << "Datum: [" << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.da
 | MultiPolygon | ✅ | WGS84 + ENU | Multiple Polygon geometries |
 | GeometryCollection | ✅ | WGS84 + ENU | Nested geometry collections |
 | Feature | ✅ | WGS84 + ENU | Geometry + properties |
-| FeatureCollection | ✅ | WGS84 + ENU | Collection with CRS and datum metadata |
+| FeatureCollection | ✅ | WGS84 + ENU | Collection with datum metadata (no CRS stored) |
 | Custom CRS | ✅ | WGS84/ENU | Automatic detection and conversion |
 
 ### CRS Property Support
@@ -482,7 +490,7 @@ geoson::write(survey_data, "public_map.geojson", geoson::CRS::WGS);  // WGS84 ou
 auto data = geoson::read("source.geojson");                   // Any input format
 geoson::write(data, "for_web.geojson", geoson::CRS::WGS);     // Web mapping
 geoson::write(data, "for_cad.geojson", geoson::CRS::ENU);     // CAD integration
-geoson::write(data, "archive.geojson");                       // Original format
+geoson::write(data, "archive.geojson");                       // ENU format (default)
 ```
 
 ### Performance Considerations

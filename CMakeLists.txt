@@ -28,7 +28,7 @@ FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord
 FetchContent_MakeAvailable(concord)
 list(APPEND ext_deps concord::concord)
 
-FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG main)
+FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG 0.3.0)
 FetchContent_MakeAvailable(pigment)
 list(APPEND ext_deps pigment::pigment)
 
