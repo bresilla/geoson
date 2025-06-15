@@ -70,7 +70,7 @@ namespace geoson {
         } else {
             // WGS flavor: coordinates are lon,lat,alt - convert to ENU using datum
             // Note: WGS constructor is (lat, lon, alt), so swap x,y
-            concord::WGS wgs{y, x, z}; 
+            concord::WGS wgs{y, x, z};
             concord::ENU enu = wgs.toENU(datum);
             return concord::Point{enu.x, enu.y, enu.z};
         }

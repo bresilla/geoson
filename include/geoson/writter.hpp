@@ -101,12 +101,11 @@ namespace geoson {
     }
 
     /// serialize a full FeatureCollection to GeoJSON (uses the original CRS from parsing)
-    inline nlohmann::json toJson(FeatureCollection const &fc) {
-        return toJson(fc, fc.crs);
-    }
+    inline nlohmann::json toJson(FeatureCollection const &fc) { return toJson(fc, fc.crs); }
 
     /// write GeoJSON out to disk with specified output CRS (pretty‐printed)
-    inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath, geoson::CRS outputCrs) {
+    inline void WriteFeatureCollection(FeatureCollection const &fc, std::filesystem::path const &outPath,
+                                       geoson::CRS outputCrs) {
         auto j = toJson(fc, outputCrs);
         std::ofstream ofs(outPath);
         if (!ofs)

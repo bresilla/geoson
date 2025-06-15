@@ -21,10 +21,10 @@ namespace geoson {
     };
 
     struct FeatureCollection {
-        CRS crs;            // Original CRS from input file (for reference/default output)
+        CRS crs; // Original CRS from input file (for reference/default output)
         concord::Datum datum;
         concord::Euler heading;
-        std::vector<Feature> features;  // All geometries stored in Point (ENU/local) coordinates
+        std::vector<Feature> features; // All geometries stored in Point (ENU/local) coordinates
     };
 
 } // namespace geoson

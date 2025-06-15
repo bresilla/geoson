@@ -4,7 +4,7 @@
 int main() {
     try {
         // 1) Read a GeoJSON file (could be in WGS or ENU format)
-        auto fc = geoson::ReadFeatureCollection("misc/field4.geojson");
+        auto fc = geoson::read("misc/field4.geojson");
 
         std::cout << "Original file information:\n";
         std::cout << fc << "\n";
@@ -15,15 +15,15 @@ int main() {
 
         // 3) Save in WGS format (converts internal Point coordinates to WGS84)
         std::cout << "Saving to WGS84 format...\n";
-        geoson::WriteFeatureCollection(fc, "misc/output_wgs84.geojson", geoson::CRS::WGS);
+        geoson::write(fc, "misc/output_wgs84.geojson", geoson::CRS::WGS);
 
         // 4) Save in ENU format (outputs Point coordinates directly)
         std::cout << "Saving to ENU format...\n";
-        geoson::WriteFeatureCollection(fc, "misc/output_enu.geojson", geoson::CRS::ENU);
+        geoson::write(fc, "misc/output_enu.geojson", geoson::CRS::ENU);
 
         // 5) Save in original format (uses the CRS from the input file)
         std::cout << "Saving in original format (default behavior)...\n";
-        geoson::WriteFeatureCollection(fc, "misc/output_original.geojson");
+        geoson::write(fc, "misc/output_original.geojson");
 
         std::cout << "\nThree files created demonstrating CRS conversion:\n";
         std::cout << "- misc/output_wgs84.geojson (WGS84/EPSG:4326 format)\n";
