@@ -13,6 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(params
     -Wno-reorder
+    -Wno-unused-parameter
+    -Wno-unused-variable
 )
 
 string(TOUPPER ${project_name} project_name_upper)
@@ -22,7 +24,7 @@ include(FetchContent)
 
 # --------------------------------------------------------------------------------------------------
 set(ext_deps)
-FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG main)
+FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG 2.0.0)
 FetchContent_MakeAvailable(concord)
 list(APPEND ext_deps concord::concord)
 

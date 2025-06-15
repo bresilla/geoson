@@ -7,22 +7,32 @@
 TEST_CASE("Types - Basic Geometry Variant") {
     SUBCASE("Point geometry") {
         concord::Datum datum{52.0, 5.0, 0.0};
-        concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+        // Convert WGS to ENU to Point
+        concord::WGS wgsCoord{52.1, 5.1, 10.0};
+        concord::ENU enu = wgsCoord.toENU(datum);
+        concord::Point point{enu.x, enu.y, enu.z};
 
         geoson::Geometry geom = point;
 
         CHECK(std::holds_alternative<concord::Point>(geom));
         auto *p = std::get_if<concord::Point>(&geom);
         REQUIRE(p != nullptr);
-        CHECK(p->wgs.lat == doctest::Approx(52.1));
-        CHECK(p->wgs.lon == doctest::Approx(5.1));
-        CHECK(p->wgs.alt == doctest::Approx(10.0));
+        // Verify by converting back to WGS
+        concord::ENU pointEnu{*p, datum};
+        concord::WGS backToWgs = pointEnu.toWGS();
+        CHECK(backToWgs.lat == doctest::Approx(52.1));
+        CHECK(backToWgs.lon == doctest::Approx(5.1));
+        CHECK(backToWgs.alt == doctest::Approx(10.0));
     }
 
     SUBCASE("Line geometry") {
         concord::Datum datum{52.0, 5.0, 0.0};
-        concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-        concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
+        concord::WGS wgsStart{52.1, 5.1, 0.0};
+        concord::WGS wgsEnd{52.2, 5.2, 0.0};
+        concord::ENU enuStart = wgsStart.toENU(datum);
+        concord::ENU enuEnd = wgsEnd.toENU(datum);
+        concord::Point start{enuStart.x, enuStart.y, enuStart.z};
+        concord::Point end{enuEnd.x, enuEnd.y, enuEnd.z};
         concord::Line line{start, end};
 
         geoson::Geometry geom = line;
@@ -32,9 +42,12 @@ TEST_CASE("Types - Basic Geometry Variant") {
 
     SUBCASE("Path geometry") {
         concord::Datum datum{52.0, 5.0, 0.0};
-        std::vector<concord::Point> points = {concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.3, 5.3, 0.0}, datum}};
+        std::vector<concord::Point> points;
+        std::vector<concord::WGS> wgsPoints = {{52.1, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.3, 5.3, 0.0}};
+        for (const auto &wgs : wgsPoints) {
+            concord::ENU enu = wgs.toENU(datum);
+            points.emplace_back(enu.x, enu.y, enu.z);
+        }
         concord::Path path{points};
 
         geoson::Geometry geom = path;
@@ -44,10 +57,13 @@ TEST_CASE("Types - Basic Geometry Variant") {
 
     SUBCASE("Polygon geometry") {
         concord::Datum datum{52.0, 5.0, 0.0};
-        std::vector<concord::Point> points = {
-            concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}, concord::Point{concord::WGS{52.2, 5.1, 0.0}, datum},
-            concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum}, concord::Point{concord::WGS{52.1, 5.2, 0.0}, datum},
-            concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}};
+        std::vector<concord::Point> points;
+        std::vector<concord::WGS> wgsPoints = {
+            {52.1, 5.1, 0.0}, {52.2, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.1, 5.2, 0.0}, {52.1, 5.1, 0.0}};
+        for (const auto &wgs : wgsPoints) {
+            concord::ENU enu = wgs.toENU(datum);
+            points.emplace_back(enu.x, enu.y, enu.z);
+        }
         concord::Polygon polygon{points};
 
         geoson::Geometry geom = polygon;
@@ -58,7 +74,9 @@ TEST_CASE("Types - Basic Geometry Variant") {
 
 TEST_CASE("Types - Feature") {
     concord::Datum datum{52.0, 5.0, 0.0};
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsCoord{52.1, 5.1, 10.0};
+    concord::ENU enu = wgsCoord.toENU(datum);
+    concord::Point point{enu.x, enu.y, enu.z};
 
     std::unordered_map<std::string, std::string> properties;
     properties["name"] = "test_feature";
@@ -73,7 +91,7 @@ TEST_CASE("Types - Feature") {
 }
 
 TEST_CASE("Types - FeatureCollection") {
-    concord::CRS crs = concord::CRS::WGS;
+    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -81,14 +99,20 @@ TEST_CASE("Types - FeatureCollection") {
     std::vector<geoson::Feature> features;
 
     // Add a point feature
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsPoint{52.1, 5.1, 10.0};
+    concord::ENU enuPoint = wgsPoint.toENU(datum);
+    concord::Point point{enuPoint.x, enuPoint.y, enuPoint.z};
     std::unordered_map<std::string, std::string> pointProps;
     pointProps["name"] = "test_point";
     features.emplace_back(geoson::Feature{point, pointProps});
 
     // Add a line feature
-    concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-    concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
+    concord::WGS wgsStart{52.1, 5.1, 0.0};
+    concord::WGS wgsEnd{52.2, 5.2, 0.0};
+    concord::ENU enuStart = wgsStart.toENU(datum);
+    concord::ENU enuEnd = wgsEnd.toENU(datum);
+    concord::Point start{enuStart.x, enuStart.y, enuStart.z};
+    concord::Point end{enuEnd.x, enuEnd.y, enuEnd.z};
     concord::Line line{start, end};
     std::unordered_map<std::string, std::string> lineProps;
     lineProps["name"] = "test_line";
@@ -96,7 +120,7 @@ TEST_CASE("Types - FeatureCollection") {
 
     geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
 
-    CHECK(fc.crs == concord::CRS::WGS);
+    CHECK(fc.crs == geoson::CRS::WGS);
     CHECK(fc.datum.lat == doctest::Approx(52.0));
     CHECK(fc.datum.lon == doctest::Approx(5.0));
     CHECK(fc.datum.alt == doctest::Approx(0.0));

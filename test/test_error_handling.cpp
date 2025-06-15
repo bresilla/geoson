@@ -198,23 +198,24 @@ TEST_CASE("Error Handling - Missing required properties") {
 
 TEST_CASE("Error Handling - Invalid geometry parsing") {
     concord::Datum datum{52.0, 5.0, 0.0};
+    geoson::CRS crs = geoson::CRS::WGS;
 
     SUBCASE("Invalid point coordinates - too few") {
         nlohmann::json coords = {5.1}; // only longitude
 
-        CHECK_THROWS_AS(geoson::parsePoint(coords, datum), nlohmann::json::out_of_range);
+        CHECK_THROWS_AS(geoson::parsePoint(coords, datum, crs), nlohmann::json::out_of_range);
     }
 
     SUBCASE("Invalid point coordinates - non-numeric") {
         nlohmann::json coords = {"invalid", 52.1};
 
-        CHECK_THROWS_AS(geoson::parsePoint(coords, datum), nlohmann::json::type_error);
+        CHECK_THROWS_AS(geoson::parsePoint(coords, datum, crs), nlohmann::json::type_error);
     }
 
     SUBCASE("Invalid polygon coordinates - missing outer ring") {
         nlohmann::json coords = nlohmann::json::array(); // empty array
 
-        CHECK_THROWS_AS(geoson::parsePolygon(coords, datum), nlohmann::json::out_of_range);
+        CHECK_THROWS_AS(geoson::parsePolygon(coords, datum, crs), nlohmann::json::out_of_range);
     }
 }
 
@@ -225,7 +226,7 @@ TEST_CASE("Error Handling - File I/O errors") {
     }
 
     SUBCASE("WriteFeatureCollection - invalid directory") {
-        concord::CRS crs = concord::CRS::WGS;
+        geoson::CRS crs = geoson::CRS::WGS;
         concord::Datum datum{52.0, 5.0, 0.0};
         concord::Euler heading{0.0, 0.0, 0.0};
         std::vector<geoson::Feature> features;

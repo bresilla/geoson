@@ -37,21 +37,27 @@ TEST_CASE("Parser - parsePoint") {
     SUBCASE("2D point") {
         nlohmann::json coords = {5.1, 52.1};
 
-        auto point = geoson::parsePoint(coords, datum);
+        auto point = geoson::parsePoint(coords, datum, geoson::CRS::WGS);
 
-        CHECK(point.wgs.lon == doctest::Approx(5.1));
-        CHECK(point.wgs.lat == doctest::Approx(52.1));
-        CHECK(point.wgs.alt == doctest::Approx(0.0));
+        // Convert back to WGS to verify coordinates
+        concord::ENU enu{point, datum};
+        concord::WGS wgs = enu.toWGS();
+        CHECK(wgs.lon == doctest::Approx(5.1));
+        CHECK(wgs.lat == doctest::Approx(52.1));
+        CHECK(wgs.alt == doctest::Approx(0.0));
     }
 
     SUBCASE("3D point") {
         nlohmann::json coords = {5.1, 52.1, 10.0};
 
-        auto point = geoson::parsePoint(coords, datum);
+        auto point = geoson::parsePoint(coords, datum, geoson::CRS::WGS);
 
-        CHECK(point.wgs.lon == doctest::Approx(5.1));
-        CHECK(point.wgs.lat == doctest::Approx(52.1));
-        CHECK(point.wgs.alt == doctest::Approx(10.0));
+        // Convert back to WGS to verify coordinates
+        concord::ENU enu{point, datum};
+        concord::WGS wgs = enu.toWGS();
+        CHECK(wgs.lon == doctest::Approx(5.1));
+        CHECK(wgs.lat == doctest::Approx(52.1));
+        CHECK(wgs.alt == doctest::Approx(10.0));
     }
 }
 
@@ -61,7 +67,7 @@ TEST_CASE("Parser - parseLineString") {
     SUBCASE("Two points (Line)") {
         nlohmann::json coords = {{5.1, 52.1, 0.0}, {5.2, 52.2, 0.0}};
 
-        auto geom = geoson::parseLineString(coords, datum);
+        auto geom = geoson::parseLineString(coords, datum, geoson::CRS::WGS);
 
         CHECK(std::holds_alternative<concord::Line>(geom));
     }
@@ -69,7 +75,7 @@ TEST_CASE("Parser - parseLineString") {
     SUBCASE("Multiple points (Path)") {
         nlohmann::json coords = {{5.1, 52.1, 0.0}, {5.2, 52.2, 0.0}, {5.3, 52.3, 0.0}};
 
-        auto geom = geoson::parseLineString(coords, datum);
+        auto geom = geoson::parseLineString(coords, datum, geoson::CRS::WGS);
 
         CHECK(std::holds_alternative<concord::Path>(geom));
     }
@@ -82,7 +88,7 @@ TEST_CASE("Parser - parsePolygon") {
         {5.1, 52.1, 0.0}, {5.2, 52.1, 0.0}, {5.2, 52.2, 0.0}, {5.1, 52.2, 0.0}, {5.1, 52.1, 0.0} // closed ring
     }};
 
-    auto polygon = geoson::parsePolygon(coords, datum);
+    auto polygon = geoson::parsePolygon(coords, datum, geoson::CRS::WGS);
 
     // Check that we get a polygon
     CHECK(polygon.getPoints().size() == 5);
@@ -94,7 +100,7 @@ TEST_CASE("Parser - parseGeometry") {
     SUBCASE("Point geometry") {
         nlohmann::json geom = {{"type", "Point"}, {"coordinates", {5.1, 52.1, 0.0}}};
 
-        auto geometries = geoson::parseGeometry(geom, datum);
+        auto geometries = geoson::parseGeometry(geom, datum, geoson::CRS::WGS);
 
         CHECK(geometries.size() == 1);
         CHECK(std::holds_alternative<concord::Point>(geometries[0]));
@@ -103,7 +109,7 @@ TEST_CASE("Parser - parseGeometry") {
     SUBCASE("LineString geometry") {
         nlohmann::json geom = {{"type", "LineString"}, {"coordinates", {{5.1, 52.1, 0.0}, {5.2, 52.2, 0.0}}}};
 
-        auto geometries = geoson::parseGeometry(geom, datum);
+        auto geometries = geoson::parseGeometry(geom, datum, geoson::CRS::WGS);
 
         CHECK(geometries.size() == 1);
         CHECK(std::holds_alternative<concord::Line>(geometries[0]));
@@ -115,7 +121,7 @@ TEST_CASE("Parser - parseGeometry") {
             {"coordinates",
              {{{5.1, 52.1, 0.0}, {5.2, 52.1, 0.0}, {5.2, 52.2, 0.0}, {5.1, 52.2, 0.0}, {5.1, 52.1, 0.0}}}}};
 
-        auto geometries = geoson::parseGeometry(geom, datum);
+        auto geometries = geoson::parseGeometry(geom, datum, geoson::CRS::WGS);
 
         CHECK(geometries.size() == 1);
         CHECK(std::holds_alternative<concord::Polygon>(geometries[0]));
@@ -125,7 +131,7 @@ TEST_CASE("Parser - parseGeometry") {
         nlohmann::json geom = {{"type", "MultiPoint"},
                                {"coordinates", {{5.1, 52.1, 0.0}, {5.2, 52.2, 0.0}, {5.3, 52.3, 0.0}}}};
 
-        auto geometries = geoson::parseGeometry(geom, datum);
+        auto geometries = geoson::parseGeometry(geom, datum, geoson::CRS::WGS);
 
         CHECK(geometries.size() == 3);
         for (const auto &g : geometries) {
@@ -139,7 +145,7 @@ TEST_CASE("Parser - parseGeometry") {
                                 {{{"type", "Point"}, {"coordinates", {5.1, 52.1, 0.0}}},
                                  {{"type", "LineString"}, {"coordinates", {{5.2, 52.2, 0.0}, {5.3, 52.3, 0.0}}}}}}};
 
-        auto geometries = geoson::parseGeometry(geom, datum);
+        auto geometries = geoson::parseGeometry(geom, datum, geoson::CRS::WGS);
 
         CHECK(geometries.size() == 2);
         CHECK(std::holds_alternative<concord::Point>(geometries[0]));
@@ -149,14 +155,14 @@ TEST_CASE("Parser - parseGeometry") {
 
 TEST_CASE("Parser - parseCRS") {
     SUBCASE("WGS84 variants") {
-        CHECK(geoson::parseCRS("EPSG:4326") == concord::CRS::WGS);
-        CHECK(geoson::parseCRS("WGS84") == concord::CRS::WGS);
-        CHECK(geoson::parseCRS("WGS") == concord::CRS::WGS);
+        CHECK(geoson::parseCRS("EPSG:4326") == geoson::CRS::WGS);
+        CHECK(geoson::parseCRS("WGS84") == geoson::CRS::WGS);
+        CHECK(geoson::parseCRS("WGS") == geoson::CRS::WGS);
     }
 
     SUBCASE("ENU variants") {
-        CHECK(geoson::parseCRS("ENU") == concord::CRS::ENU);
-        CHECK(geoson::parseCRS("ECEF") == concord::CRS::ENU);
+        CHECK(geoson::parseCRS("ENU") == geoson::CRS::ENU);
+        CHECK(geoson::parseCRS("ECEF") == geoson::CRS::ENU);
     }
 
     SUBCASE("Unknown CRS throws") {
@@ -198,7 +204,7 @@ TEST_CASE("Parser - File operations") {
 
         auto fc = geoson::ReadFeatureCollection(test_file);
 
-        CHECK(fc.crs == concord::CRS::WGS);
+        CHECK(fc.crs == geoson::CRS::WGS);
         CHECK(fc.datum.lat == doctest::Approx(52.0));
         CHECK(fc.datum.lon == doctest::Approx(5.0));
         CHECK(fc.datum.alt == doctest::Approx(0.0));

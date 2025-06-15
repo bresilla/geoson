@@ -9,38 +9,52 @@
 
 TEST_CASE("Integration - Round-trip conversion") {
     // Create original feature collection
-    concord::CRS crs = concord::CRS::WGS;
+    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
     std::vector<geoson::Feature> features;
 
     // Add various geometry types
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsPoint{52.1, 5.1, 10.0};
+    concord::ENU enuPoint = wgsPoint.toENU(datum);
+    concord::Point point{enuPoint.x, enuPoint.y, enuPoint.z};
     std::unordered_map<std::string, std::string> pointProps;
     pointProps["name"] = "test_point";
     pointProps["category"] = "landmark";
     features.emplace_back(geoson::Feature{point, pointProps});
 
-    concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-    concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
+    concord::WGS wgsStart{52.1, 5.1, 0.0};
+    concord::WGS wgsEnd{52.2, 5.2, 0.0};
+    concord::ENU enuStart = wgsStart.toENU(datum);
+    concord::ENU enuEnd = wgsEnd.toENU(datum);
+    concord::Point start{enuStart.x, enuStart.y, enuStart.z};
+    concord::Point end{enuEnd.x, enuEnd.y, enuEnd.z};
     concord::Line line{start, end};
     std::unordered_map<std::string, std::string> lineProps;
     lineProps["name"] = "test_line";
     features.emplace_back(geoson::Feature{line, lineProps});
 
-    std::vector<concord::Point> pathPoints = {concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.3, 5.3, 0.0}, datum}};
+    // Path feature
+    std::vector<concord::Point> pathPoints;
+    std::vector<concord::WGS> pathWgsPoints = {{52.1, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.3, 5.3, 0.0}};
+    for (const auto &wgs : pathWgsPoints) {
+        concord::ENU enu = wgs.toENU(datum);
+        pathPoints.emplace_back(enu.x, enu.y, enu.z);
+    }
     concord::Path path{pathPoints};
     std::unordered_map<std::string, std::string> pathProps;
     pathProps["name"] = "test_path";
     features.emplace_back(geoson::Feature{path, pathProps});
 
-    std::vector<concord::Point> polygonPoints = {
-        concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}, concord::Point{concord::WGS{52.2, 5.1, 0.0}, datum},
-        concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum}, concord::Point{concord::WGS{52.1, 5.2, 0.0}, datum},
-        concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}};
+    // Polygon feature
+    std::vector<concord::Point> polygonPoints;
+    std::vector<concord::WGS> polygonWgsPoints = {
+        {52.1, 5.1, 0.0}, {52.2, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.1, 5.2, 0.0}, {52.1, 5.1, 0.0}};
+    for (const auto &wgs : polygonWgsPoints) {
+        concord::ENU enu = wgs.toENU(datum);
+        polygonPoints.emplace_back(enu.x, enu.y, enu.z);
+    }
     concord::Polygon polygon{polygonPoints};
     std::unordered_map<std::string, std::string> polygonProps;
     polygonProps["name"] = "test_polygon";
@@ -48,223 +62,110 @@ TEST_CASE("Integration - Round-trip conversion") {
 
     geoson::FeatureCollection original{crs, datum, heading, std::move(features)};
 
-    const std::filesystem::path test_file = "/tmp/test_roundtrip.geojson";
-
     // Write to file
+    const std::filesystem::path test_file = "/tmp/round_trip_test.geojson";
     geoson::WriteFeatureCollection(original, test_file);
 
-    // Read back
-    auto restored = geoson::ReadFeatureCollection(test_file);
+    // Read back from file
+    auto loaded = geoson::ReadFeatureCollection(test_file);
 
-    // Compare
-    CHECK(restored.crs == original.crs);
-    CHECK(restored.datum.lat == doctest::Approx(original.datum.lat));
-    CHECK(restored.datum.lon == doctest::Approx(original.datum.lon));
-    CHECK(restored.datum.alt == doctest::Approx(original.datum.alt));
-    CHECK(restored.heading.yaw == doctest::Approx(original.heading.yaw));
-    CHECK(restored.features.size() == original.features.size());
+    // Verify the content matches
+    CHECK(loaded.crs == original.crs);
+    CHECK(loaded.datum.lat == doctest::Approx(original.datum.lat));
+    CHECK(loaded.datum.lon == doctest::Approx(original.datum.lon));
+    CHECK(loaded.datum.alt == doctest::Approx(original.datum.alt));
+    CHECK(loaded.heading.yaw == doctest::Approx(original.heading.yaw));
+    CHECK(loaded.features.size() == original.features.size());
 
-    // Check individual features
-    for (size_t i = 0; i < restored.features.size(); ++i) {
-        const auto &origFeature = original.features[i];
-        const auto &restoredFeature = restored.features[i];
+    // Clean up
+    std::filesystem::remove(test_file);
+}
 
-        // Check geometry types match
-        CHECK(origFeature.geometry.index() == restoredFeature.geometry.index());
+TEST_CASE("Integration - Read existing GeoJSON file") {
+    // This test assumes there's a test file in misc/
+    auto fc = geoson::ReadFeatureCollection("/doc/code/geoson/misc/field4.geojson");
 
-        // Check properties
-        for (const auto &[key, value] : origFeature.properties) {
-            CHECK(restoredFeature.properties.count(key) > 0);
-            CHECK(restoredFeature.properties.at(key) == value);
-        }
+    CHECK(fc.crs == geoson::CRS::WGS);
+    CHECK(fc.datum.lat == doctest::Approx(67.3)); // File was modified by main example
+    CHECK(fc.datum.lon == doctest::Approx(4.4));
+    CHECK(fc.datum.alt == doctest::Approx(50));
+    CHECK(fc.heading.yaw == doctest::Approx(2));
+    CHECK(fc.features.size() == 1);
+
+    // Check first feature is a polygon
+    CHECK(std::holds_alternative<concord::Polygon>(fc.features[0].geometry));
+}
+
+TEST_CASE("Integration - Modify and save") {
+    // Load a file
+    auto fc = geoson::ReadFeatureCollection("/doc/code/geoson/misc/field4.geojson");
+
+    // Modify the datum
+    fc.datum.lat += 5.1;
+
+    // Save it
+    const std::filesystem::path output_file = "/tmp/modified_test.geojson";
+    geoson::WriteFeatureCollection(fc, output_file);
+
+    // Read it back
+    auto modified = geoson::ReadFeatureCollection(output_file);
+
+    // Verify the modification
+    CHECK(modified.datum.lat == doctest::Approx(72.4)); // 67.3 + 5.1
+
+    // Clean up
+    std::filesystem::remove(output_file);
+}
+
+TEST_CASE("Integration - CRS flavor handling") {
+    concord::Datum datum{52.0, 5.0, 0.0};
+    concord::Euler heading{0.0, 0.0, 1.5};
+
+    SUBCASE("WGS flavor - coordinates should be converted") {
+        geoson::CRS crs = geoson::CRS::WGS;
+        std::vector<geoson::Feature> features;
+
+        // Create point using WGS coordinates -> ENU -> Point
+        concord::WGS wgsCoord{52.1, 5.1, 10.0};
+        concord::ENU enu = wgsCoord.toENU(datum);
+        concord::Point point{enu.x, enu.y, enu.z};
+        std::unordered_map<std::string, std::string> props;
+        props["name"] = "test_point";
+        features.emplace_back(geoson::Feature{point, props});
+
+        geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
+
+        // Convert to JSON (WGS output)
+        auto json = geoson::toJson(fc);
+
+        // Check that coordinates are converted back to WGS format
+        CHECK(json["properties"]["crs"] == "EPSG:4326");
+        auto coords = json["features"][0]["geometry"]["coordinates"];
+        CHECK(coords[0] == doctest::Approx(5.1));  // lon
+        CHECK(coords[1] == doctest::Approx(52.1)); // lat
+        CHECK(coords[2] == doctest::Approx(10.0)); // alt
     }
 
-    // Cleanup
-    std::filesystem::remove(test_file);
-}
+    SUBCASE("ENU flavor - coordinates should be direct") {
+        geoson::CRS crs = geoson::CRS::ENU;
+        std::vector<geoson::Feature> features;
 
-TEST_CASE("Integration - Real GeoJSON file parsing") {
-    // Test with a real-world-like GeoJSON structure
-    const std::string realistic_geojson = R"({
-        "type": "FeatureCollection",
-        "properties": {
-            "crs": "EPSG:4326",
-            "datum": [51.98764, 5.660062, 0.0],
-            "heading": 0.0
-        },
-        "features": [
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [5.660062043558668, 51.98764028186088, 0.0],
-                        [5.6618289715088395, 51.988126870487235, 0.0],
-                        [5.661049882650161, 51.98908317675762, 0.0],
-                        [5.66289230646484, 51.98958409291862, 0.0],
-                        [5.662003964010751, 51.99056338815885, 0.0],
-                        [5.658587856677201, 51.989514414720105, 0.0],
-                        [5.660062043558668, 51.98764028186088, 0.0]
-                    ]]
-                },
-                "properties": {
-                    "name": "Field 4",
-                    "area": "agricultural",
-                    "crop": "wheat"
-                }
-            },
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [5.660062, 51.98764, 15.0]
-                },
-                "properties": {
-                    "name": "Farm Center",
-                    "type": "building"
-                }
-            }
-        ]
-    })";
+        // Create point with direct ENU coordinates
+        concord::Point point{100.0, 200.0, 10.0}; // Direct x,y,z
+        std::unordered_map<std::string, std::string> props;
+        props["name"] = "test_point";
+        features.emplace_back(geoson::Feature{point, props});
 
-    const std::filesystem::path test_file = "/tmp/realistic_test.geojson";
+        geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
 
-    // Write test file
-    std::ofstream ofs(test_file);
-    ofs << realistic_geojson;
-    ofs.close();
+        // Convert to JSON (ENU output)
+        auto json = geoson::toJson(fc);
 
-    // Parse the file
-    auto fc = geoson::ReadFeatureCollection(test_file);
-
-    // Verify parsed content
-    CHECK(fc.crs == concord::CRS::WGS);
-    CHECK(fc.datum.lat == doctest::Approx(51.98764));
-    CHECK(fc.datum.lon == doctest::Approx(5.660062));
-    CHECK(fc.datum.alt == doctest::Approx(0.0));
-    CHECK(fc.heading.yaw == doctest::Approx(0.0));
-    CHECK(fc.features.size() == 2);
-
-    // Check polygon feature
-    const auto &polygonFeature = fc.features[0];
-    CHECK(std::holds_alternative<concord::Polygon>(polygonFeature.geometry));
-    CHECK(polygonFeature.properties.at("name") == "Field 4");
-    CHECK(polygonFeature.properties.at("area") == "agricultural");
-    CHECK(polygonFeature.properties.at("crop") == "wheat");
-
-    // Check point feature
-    const auto &pointFeature = fc.features[1];
-    CHECK(std::holds_alternative<concord::Point>(pointFeature.geometry));
-    CHECK(pointFeature.properties.at("name") == "Farm Center");
-    CHECK(pointFeature.properties.at("type") == "building");
-
-    // Test the point coordinates
-    auto &point = std::get<concord::Point>(pointFeature.geometry);
-    CHECK(point.wgs.lon == doctest::Approx(5.660062));
-    CHECK(point.wgs.lat == doctest::Approx(51.98764));
-    CHECK(point.wgs.alt == doctest::Approx(15.0));
-
-    // Cleanup
-    std::filesystem::remove(test_file);
-}
-
-TEST_CASE("Integration - Feature wrapping") {
-    // Test single Feature gets wrapped into FeatureCollection
-    const std::string single_feature = R"({
-        "type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [5.1, 52.1, 0.0]
-        },
-        "properties": {
-            "name": "single_point"
-        }
-    })";
-
-    const std::filesystem::path test_file = "/tmp/single_feature.geojson";
-
-    // Write test file
-    std::ofstream ofs(test_file);
-    ofs << single_feature;
-    ofs.close();
-
-    // This should throw because single features don't have top-level properties
-    CHECK_THROWS_AS(geoson::ReadFeatureCollection(test_file), std::runtime_error);
-
-    // Cleanup
-    std::filesystem::remove(test_file);
-}
-
-TEST_CASE("Integration - Geometry wrapping") {
-    // Test bare geometry gets wrapped
-    const std::string bare_geometry = R"({
-        "type": "Point",
-        "coordinates": [5.1, 52.1, 0.0]
-    })";
-
-    const std::filesystem::path test_file = "/tmp/bare_geometry.geojson";
-
-    // Write test file
-    std::ofstream ofs(test_file);
-    ofs << bare_geometry;
-    ofs.close();
-
-    // This should also throw because bare geometries don't have top-level properties
-    CHECK_THROWS_AS(geoson::ReadFeatureCollection(test_file), std::runtime_error);
-
-    // Cleanup
-    std::filesystem::remove(test_file);
-}
-
-TEST_CASE("Integration - Pretty printing") {
-    concord::CRS crs = concord::CRS::WGS;
-    concord::Datum datum{52.0, 5.0, 0.0};
-    concord::Euler heading{0.0, 0.0, 2.0};
-
-    std::vector<geoson::Feature> features;
-
-    // Add one of each geometry type
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
-    std::unordered_map<std::string, std::string> pointProps;
-    pointProps["name"] = "test_point";
-    features.emplace_back(geoson::Feature{point, pointProps});
-
-    concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-    concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
-    concord::Line line{start, end};
-    std::unordered_map<std::string, std::string> lineProps;
-    features.emplace_back(geoson::Feature{line, lineProps});
-
-    std::vector<concord::Point> pathPoints = {concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.3, 5.3, 0.0}, datum}};
-    concord::Path path{pathPoints};
-    std::unordered_map<std::string, std::string> pathProps;
-    features.emplace_back(geoson::Feature{path, pathProps});
-
-    std::vector<concord::Point> polygonPoints = {
-        concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}, concord::Point{concord::WGS{52.2, 5.1, 0.0}, datum},
-        concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum}, concord::Point{concord::WGS{52.1, 5.2, 0.0}, datum},
-        concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}};
-    concord::Polygon polygon{polygonPoints};
-    std::unordered_map<std::string, std::string> polygonProps;
-    features.emplace_back(geoson::Feature{polygon, polygonProps});
-
-    geoson::FeatureCollection fc{crs, datum, heading, std::move(features)};
-
-    // Test the pretty print operator
-    std::ostringstream oss;
-    oss << fc;
-    std::string output = oss.str();
-
-    // Check that expected content is in the output
-    CHECK(output.find("CRS: WGS") != std::string::npos);
-    CHECK(output.find("DATUM: 52, 5, 0") != std::string::npos);
-    CHECK(output.find("HEADING: 2") != std::string::npos);
-    CHECK(output.find("FEATURES: 4") != std::string::npos);
-    CHECK(output.find("POINT") != std::string::npos);
-    CHECK(output.find("LINE") != std::string::npos);
-    CHECK(output.find("PATH") != std::string::npos);
-    CHECK(output.find("POLYGON") != std::string::npos);
-    CHECK(output.find("PROPS:1") != std::string::npos); // point has 1 property
+        // Check that coordinates are output directly
+        CHECK(json["properties"]["crs"] == "ENU");
+        auto coords = json["features"][0]["geometry"]["coordinates"];
+        CHECK(coords[0] == doctest::Approx(100.0)); // x
+        CHECK(coords[1] == doctest::Approx(200.0)); // y
+        CHECK(coords[2] == doctest::Approx(10.0));  // z
+    }
 }

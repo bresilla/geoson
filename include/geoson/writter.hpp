@@ -9,10 +9,18 @@
 namespace geoson {
 
     /// helper to turn a single Geometry into its GeoJSON object
-    inline nlohmann::json geometryToJson(Geometry const &geom) {
-        // small helper to build [lon,lat,alt]
+    inline nlohmann::json geometryToJson(Geometry const &geom, const concord::Datum &datum, geoson::CRS crs) {
+        // small helper to build coordinates based on CRS flavor
         auto ptCoords = [&](concord::Point const &p) {
-            return nlohmann::json::array({p.wgs.lon, p.wgs.lat, p.wgs.alt});
+            if (crs == geoson::CRS::ENU) {
+                // ENU flavor: output coordinates directly as x,y,z
+                return nlohmann::json::array({p.x, p.y, p.z});
+            } else {
+                // WGS flavor: convert Point to ENU with datum, then to WGS
+                concord::ENU enu{p, datum};
+                concord::WGS wgs = enu.toWGS();
+                return nlohmann::json::array({wgs.lon, wgs.lat, wgs.alt});
+            }
         };
 
         return std::visit(
@@ -46,13 +54,13 @@ namespace geoson {
     }
 
     /// turn one Feature into its GeoJSON object
-    inline nlohmann::json featureToJson(Feature const &f) {
+    inline nlohmann::json featureToJson(Feature const &f, const concord::Datum &datum, geoson::CRS crs) {
         nlohmann::json j;
         j["type"] = "Feature";
         j["properties"] = nlohmann::json::object();
         for (auto const &kv : f.properties)
             j["properties"][kv.first] = kv.second;
-        j["geometry"] = geometryToJson(f.geometry);
+        j["geometry"] = geometryToJson(f.geometry, datum, crs);
         return j;
     }
 
@@ -68,10 +76,10 @@ namespace geoson {
 
             // crs → string
             switch (fc.crs) {
-            case concord::CRS::WGS:
+            case geoson::CRS::WGS:
                 P["crs"] = "EPSG:4326";
                 break;
-            case concord::CRS::ENU:
+            case geoson::CRS::ENU:
                 P["crs"] = "ENU";
                 break;
             }
@@ -86,7 +94,7 @@ namespace geoson {
         // features
         j["features"] = nlohmann::json::array();
         for (auto const &f : fc.features)
-            j["features"].push_back(featureToJson(f));
+            j["features"].push_back(featureToJson(f, fc.datum, fc.crs));
 
         return j;
     }

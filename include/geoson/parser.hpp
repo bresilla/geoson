@@ -58,55 +58,64 @@ namespace geoson {
         return m;
     }
 
-    inline concord::Point parsePoint(const json &coords, const concord::Datum &datum) {
-        double lon = coords.at(0).get<double>();
-        double lat = coords.at(1).get<double>();
-        double alt = coords.size() > 2 ? coords.at(2).get<double>() : 0.0;
-        return concord::Point{concord::WGS{lat, lon, alt}, datum};
+    inline concord::Point parsePoint(const json &coords, const concord::Datum &datum, geoson::CRS crs) {
+        double x = coords.at(0).get<double>();
+        double y = coords.at(1).get<double>();
+        double z = coords.size() > 2 ? coords.at(2).get<double>() : 0.0;
+
+        if (crs == geoson::CRS::ENU) {
+            // ENU flavor: coordinates are already local x,y,z
+            return concord::Point{x, y, z};
+        } else {
+            // WGS flavor: coordinates are lon,lat,alt - convert to ENU using datum
+            concord::WGS wgs{y, x, z}; // Note: WGS constructor is (lat, lon, alt)
+            concord::ENU enu = wgs.toENU(datum);
+            return concord::Point{enu.x, enu.y, enu.z};
+        }
     }
 
-    inline Geometry parseLineString(const json &coords, const concord::Datum &datum) {
+    inline Geometry parseLineString(const json &coords, const concord::Datum &datum, geoson::CRS crs) {
         std::vector<concord::Point> pts;
         pts.reserve(coords.size());
         for (auto const &c : coords)
-            pts.push_back(parsePoint(c, datum));
+            pts.push_back(parsePoint(c, datum, crs));
         if (pts.size() == 2)
             return concord::Line{pts[0], pts[1]};
         else
             return concord::Path{pts};
     }
 
-    inline concord::Polygon parsePolygon(const json &coords, const concord::Datum &datum) {
+    inline concord::Polygon parsePolygon(const json &coords, const concord::Datum &datum, geoson::CRS crs) {
         std::vector<concord::Point> pts;
         auto const &ring = coords.at(0);
         pts.reserve(ring.size());
         for (auto const &c : ring)
-            pts.push_back(parsePoint(c, datum));
+            pts.push_back(parsePoint(c, datum, crs));
         return concord::Polygon{pts};
     }
 
-    inline std::vector<Geometry> parseGeometry(const json &geom, const concord::Datum &datum) {
+    inline std::vector<Geometry> parseGeometry(const json &geom, const concord::Datum &datum, geoson::CRS crs) {
         std::vector<Geometry> out;
         auto type = geom.at("type").get<std::string>();
 
         if (type == "Point") {
-            out.emplace_back(parsePoint(geom.at("coordinates"), datum));
+            out.emplace_back(parsePoint(geom.at("coordinates"), datum, crs));
         } else if (type == "LineString") {
-            out.emplace_back(parseLineString(geom.at("coordinates"), datum));
+            out.emplace_back(parseLineString(geom.at("coordinates"), datum, crs));
         } else if (type == "Polygon") {
-            out.emplace_back(parsePolygon(geom.at("coordinates"), datum));
+            out.emplace_back(parsePolygon(geom.at("coordinates"), datum, crs));
         } else if (type == "MultiPoint") {
             for (auto const &c : geom.at("coordinates"))
-                out.emplace_back(parsePoint(c, datum));
+                out.emplace_back(parsePoint(c, datum, crs));
         } else if (type == "MultiLineString") {
-            for (auto const &line : geom.at("coordinates"))
-                out.emplace_back(parseLineString(line, datum));
+            for (auto const &linegeoson : geom.at("coordinates"))
+                out.emplace_back(parseLineString(linegeoson, datum, crs));
         } else if (type == "MultiPolygon") {
             for (auto const &poly : geom.at("coordinates"))
-                out.emplace_back(parsePolygon(poly, datum));
+                out.emplace_back(parsePolygon(poly, datum, crs));
         } else if (type == "GeometryCollection") {
             for (auto const &sub : geom.at("geometries")) {
-                auto subs = parseGeometry(sub, datum);
+                auto subs = parseGeometry(sub, datum, crs);
                 out.insert(out.end(), subs.begin(), subs.end());
             }
         }
@@ -115,11 +124,11 @@ namespace geoson {
 
     // ––– parse the CRS string into the enum –––
 
-    inline concord::CRS parseCRS(const std::string &s) {
+    inline geoson::CRS parseCRS(const std::string &s) {
         if (s == "EPSG:4326" || s == "WGS84" || s == "WGS")
-            return concord::CRS::WGS;
+            return geoson::CRS::WGS;
         else if (s == "ENU" || s == "ECEF")
-            return concord::CRS::ENU;
+            return geoson::CRS::ENU;
         throw std::runtime_error("Unknown CRS string: " + s);
     }
 
@@ -155,7 +164,7 @@ namespace geoson {
         for (auto const &feat : fc_json["features"]) {
             if (feat.value("geometry", json{}).is_null())
                 continue;
-            auto geoms = parseGeometry(feat["geometry"], d);
+            auto geoms = parseGeometry(feat["geometry"], d, crsVal);
             auto props_map = parseProperties(feat.value("properties", json::object()));
             for (auto &g : geoms)
                 fc.features.emplace_back(Feature{std::move(g), props_map});
@@ -169,10 +178,10 @@ namespace geoson {
     inline std::ostream &operator<<(std::ostream &os, FeatureCollection const &fc) {
         os << "CRS: ";
         switch (fc.crs) {
-        case concord::CRS::WGS:
+        case geoson::CRS::WGS:
             os << "WGS";
             break;
-        case concord::CRS::ENU:
+        case geoson::CRS::ENU:
             os << "ENU";
             break;
         }

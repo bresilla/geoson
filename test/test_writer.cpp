@@ -10,10 +10,12 @@ TEST_CASE("Writer - geometryToJson") {
     concord::Datum datum{52.0, 5.0, 0.0};
 
     SUBCASE("Point to JSON") {
-        concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+        concord::WGS wgsCoord{52.1, 5.1, 10.0};
+        concord::ENU enu = wgsCoord.toENU(datum);
+        concord::Point point{enu.x, enu.y, enu.z};
         geoson::Geometry geom = point;
 
-        auto json = geoson::geometryToJson(geom);
+        auto json = geoson::geometryToJson(geom, datum, geoson::CRS::WGS);
 
         CHECK(json["type"] == "Point");
         CHECK(json["coordinates"].is_array());
@@ -24,12 +26,16 @@ TEST_CASE("Writer - geometryToJson") {
     }
 
     SUBCASE("Line to JSON") {
-        concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-        concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
+        concord::WGS wgsStart{52.1, 5.1, 0.0};
+        concord::WGS wgsEnd{52.2, 5.2, 0.0};
+        concord::ENU enuStart = wgsStart.toENU(datum);
+        concord::ENU enuEnd = wgsEnd.toENU(datum);
+        concord::Point start{enuStart.x, enuStart.y, enuStart.z};
+        concord::Point end{enuEnd.x, enuEnd.y, enuEnd.z};
         concord::Line line{start, end};
         geoson::Geometry geom = line;
 
-        auto json = geoson::geometryToJson(geom);
+        auto json = geoson::geometryToJson(geom, datum, geoson::CRS::WGS);
 
         CHECK(json["type"] == "LineString");
         CHECK(json["coordinates"].is_array());
@@ -47,13 +53,16 @@ TEST_CASE("Writer - geometryToJson") {
     }
 
     SUBCASE("Path to JSON") {
-        std::vector<concord::Point> points = {concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum},
-                                              concord::Point{concord::WGS{52.3, 5.3, 0.0}, datum}};
+        std::vector<concord::Point> points;
+        std::vector<concord::WGS> wgsPoints = {{52.1, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.3, 5.3, 0.0}};
+        for (const auto &wgs : wgsPoints) {
+            concord::ENU enu = wgs.toENU(datum);
+            points.emplace_back(enu.x, enu.y, enu.z);
+        }
         concord::Path path{points};
         geoson::Geometry geom = path;
 
-        auto json = geoson::geometryToJson(geom);
+        auto json = geoson::geometryToJson(geom, datum, geoson::CRS::WGS);
 
         CHECK(json["type"] == "LineString");
         CHECK(json["coordinates"].is_array());
@@ -68,15 +77,18 @@ TEST_CASE("Writer - geometryToJson") {
     }
 
     SUBCASE("Polygon to JSON") {
-        std::vector<concord::Point> points = {
-            concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum}, concord::Point{concord::WGS{52.2, 5.1, 0.0}, datum},
-            concord::Point{concord::WGS{52.2, 5.2, 0.0}, datum}, concord::Point{concord::WGS{52.1, 5.2, 0.0}, datum},
-            concord::Point{concord::WGS{52.1, 5.1, 0.0}, datum} // closed ring
+        std::vector<concord::Point> points;
+        std::vector<concord::WGS> wgsPoints = {
+            {52.1, 5.1, 0.0}, {52.2, 5.1, 0.0}, {52.2, 5.2, 0.0}, {52.1, 5.2, 0.0}, {52.1, 5.1, 0.0} // closed ring
         };
+        for (const auto &wgs : wgsPoints) {
+            concord::ENU enu = wgs.toENU(datum);
+            points.emplace_back(enu.x, enu.y, enu.z);
+        }
         concord::Polygon polygon{points};
         geoson::Geometry geom = polygon;
 
-        auto json = geoson::geometryToJson(geom);
+        auto json = geoson::geometryToJson(geom, datum, geoson::CRS::WGS);
 
         CHECK(json["type"] == "Polygon");
         CHECK(json["coordinates"].is_array());
@@ -87,7 +99,9 @@ TEST_CASE("Writer - geometryToJson") {
 
 TEST_CASE("Writer - featureToJson") {
     concord::Datum datum{52.0, 5.0, 0.0};
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsCoord{52.1, 5.1, 10.0};
+    concord::ENU enu = wgsCoord.toENU(datum);
+    concord::Point point{enu.x, enu.y, enu.z};
 
     std::unordered_map<std::string, std::string> properties;
     properties["name"] = "test_feature";
@@ -95,7 +109,7 @@ TEST_CASE("Writer - featureToJson") {
 
     geoson::Feature feature{point, properties};
 
-    auto json = geoson::featureToJson(feature);
+    auto json = geoson::featureToJson(feature, datum, geoson::CRS::WGS);
 
     CHECK(json["type"] == "Feature");
     CHECK(json.contains("geometry"));
@@ -110,7 +124,7 @@ TEST_CASE("Writer - featureToJson") {
 }
 
 TEST_CASE("Writer - toJson FeatureCollection") {
-    concord::CRS crs = concord::CRS::WGS;
+    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
@@ -118,14 +132,20 @@ TEST_CASE("Writer - toJson FeatureCollection") {
     std::vector<geoson::Feature> features;
 
     // Point feature
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsPoint{52.1, 5.1, 10.0};
+    concord::ENU enuPoint = wgsPoint.toENU(datum);
+    concord::Point point{enuPoint.x, enuPoint.y, enuPoint.z};
     std::unordered_map<std::string, std::string> pointProps;
     pointProps["name"] = "test_point";
     features.emplace_back(geoson::Feature{point, pointProps});
 
     // Line feature
-    concord::Point start{concord::WGS{52.1, 5.1, 0.0}, datum};
-    concord::Point end{concord::WGS{52.2, 5.2, 0.0}, datum};
+    concord::WGS wgsStart{52.1, 5.1, 0.0};
+    concord::WGS wgsEnd{52.2, 5.2, 0.0};
+    concord::ENU enuStart = wgsStart.toENU(datum);
+    concord::ENU enuEnd = wgsEnd.toENU(datum);
+    concord::Point start{enuStart.x, enuStart.y, enuStart.z};
+    concord::Point end{enuEnd.x, enuEnd.y, enuEnd.z};
     concord::Line line{start, end};
     std::unordered_map<std::string, std::string> lineProps;
     lineProps["name"] = "test_line";
@@ -171,12 +191,13 @@ TEST_CASE("Writer - toJson FeatureCollection") {
 }
 
 TEST_CASE("Writer - toJson with ENU CRS") {
-    concord::CRS crs = concord::CRS::ENU;
+    geoson::CRS crs = geoson::CRS::ENU;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 1.5};
 
     std::vector<geoson::Feature> features;
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    // For ENU test, create point directly with x,y,z coordinates
+    concord::Point point{100.0, 200.0, 10.0}; // Direct ENU coordinates
     std::unordered_map<std::string, std::string> props;
     features.emplace_back(geoson::Feature{point, props});
 
@@ -188,12 +209,14 @@ TEST_CASE("Writer - toJson with ENU CRS") {
 }
 
 TEST_CASE("Writer - WriteFeatureCollection") {
-    concord::CRS crs = concord::CRS::WGS;
+    geoson::CRS crs = geoson::CRS::WGS;
     concord::Datum datum{52.0, 5.0, 0.0};
     concord::Euler heading{0.0, 0.0, 2.0};
 
     std::vector<geoson::Feature> features;
-    concord::Point point{concord::WGS{52.1, 5.1, 10.0}, datum};
+    concord::WGS wgsCoord{52.1, 5.1, 10.0};
+    concord::ENU enu = wgsCoord.toENU(datum);
+    concord::Point point{enu.x, enu.y, enu.z};
     std::unordered_map<std::string, std::string> props;
     props["name"] = "test_point";
     features.emplace_back(geoson::Feature{point, props});
