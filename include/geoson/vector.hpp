@@ -44,43 +44,44 @@ public:
             throw std::runtime_error("Vector::fromFile: No features found in file");
         }
 
-        concord::Polygon* field_polygon = nullptr;
-        std::unordered_map<std::string, std::string> field_props;
+        std::optional<std::pair<concord::Polygon, std::unordered_map<std::string, std::string>>> field_data;
         
+        // First, look for a feature explicitly marked as "field"
         for (const auto& feature : fc.features) {
-            if (auto* poly = std::get_if<concord::Polygon>(&feature.geometry)) {
+            if (std::holds_alternative<concord::Polygon>(feature.geometry)) {
                 auto it = feature.properties.find("type");
                 if (it != feature.properties.end() && it->second == "field") {
-                    field_polygon = poly;
-                    field_props = feature.properties;
+                    field_data = std::make_pair(std::get<concord::Polygon>(feature.geometry), feature.properties);
                     break;
                 }
             }
         }
         
-        if (!field_polygon) {
+        // If no explicit field found, use the first polygon
+        if (!field_data) {
             for (const auto& feature : fc.features) {
-                if (auto* poly = std::get_if<concord::Polygon>(&feature.geometry)) {
-                    field_polygon = poly;
-                    field_props = feature.properties;
+                if (std::holds_alternative<concord::Polygon>(feature.geometry)) {
+                    field_data = std::make_pair(std::get<concord::Polygon>(feature.geometry), feature.properties);
                     break;
                 }
             }
         }
         
-        if (!field_polygon) {
+        if (!field_data) {
             throw std::runtime_error("Vector::fromFile: No polygon found to use as field boundary");
         }
 
-        Vector vector(*field_polygon, fc.datum, fc.heading);
-        vector.field_properties_ = field_props;
+        Vector vector(field_data->first, fc.datum, fc.heading);
+        vector.field_properties_ = field_data->second;
         
+        // Add all other features as elements (exclude the field boundary)
         for (const auto& feature : fc.features) {
-            if (!std::holds_alternative<concord::Polygon>(feature.geometry) || 
-                &std::get<concord::Polygon>(feature.geometry) != field_polygon) {
-                
+            // Skip features that are explicitly marked as "field" type
+            auto type_it = feature.properties.find("type");
+            bool isExplicitField = (type_it != feature.properties.end() && type_it->second == "field");
+            
+            if (!isExplicitField) {
                 std::string elem_type = "unknown";
-                auto type_it = feature.properties.find("type");
                 if (type_it != feature.properties.end()) {
                     elem_type = type_it->second;
                 }
@@ -106,10 +107,6 @@ public:
         }
         
         geoson::write(fc, path, outputCrs);
-    }
-
-    void toFile(const std::filesystem::path& path) const {
-        toFile(path, CRS::ENU);
     }
 
     const concord::Polygon& getFieldBoundary() const { return field_boundary_; }
