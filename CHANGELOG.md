@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2025-06-28
+
+### <!-- 0 -->⛰️  Features
+
+- Refactor GeoJSON processing and update test infrastructure
+- Introduce core geographical vector data structures
+
 ## [1.1.0] - 2025-06-15
 
 ### <!-- 0 -->⛰️  Features
