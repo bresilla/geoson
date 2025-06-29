@@ -27,6 +27,9 @@ private:
     concord::Datum datum_;
     concord::Euler heading_;
     CRS crs_;
+    
+    // Global properties for the entire vector collection
+    std::unordered_map<std::string, std::string> global_properties_;
 
 public:
     Vector() = delete;
@@ -73,6 +76,7 @@ public:
 
         Vector vector(field_data->first, fc.datum, fc.heading);
         vector.field_properties_ = field_data->second;
+        vector.global_properties_ = fc.global_properties;
         
         // Add all other features as elements (exclude the field boundary)
         for (const auto& feature : fc.features) {
@@ -97,6 +101,7 @@ public:
         FeatureCollection fc;
         fc.datum = datum_;
         fc.heading = heading_;
+        fc.global_properties = global_properties_;
         
         auto field_props = field_properties_;
         field_props["type"] = "field";
@@ -234,6 +239,15 @@ public:
 
     CRS getCRS() const { return crs_; }
     void setCRS(CRS crs) { crs_ = crs; }
+
+    // Global properties management
+    void setGlobalProperty(const std::string& key, const std::string& value) { global_properties_[key] = value; }
+    std::string getGlobalProperty(const std::string& key, const std::string& default_value = "") const {
+        auto it = global_properties_.find(key);
+        return (it != global_properties_.end()) ? it->second : default_value;
+    }
+    const std::unordered_map<std::string, std::string>& getGlobalProperties() const { return global_properties_; }
+    void removeGlobalProperty(const std::string& key) { global_properties_.erase(key); }
 
     auto begin() { return elements_.begin(); }
     auto end() { return elements_.end(); }

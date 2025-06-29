@@ -161,6 +161,17 @@ namespace geoson {
         fc.datum = d;
         fc.heading = euler;
         fc.features.reserve(fc_json["features"].size());
+        
+        // Parse global properties (excluding built-in ones)
+        for (const auto& [key, value] : P.items()) {
+            if (key != "crs" && key != "datum" && key != "heading") {
+                if (value.is_string()) {
+                    fc.global_properties[key] = value.get<std::string>();
+                } else {
+                    fc.global_properties[key] = value.dump();
+                }
+            }
+        }
 
         for (auto const &feat : fc_json["features"]) {
             if (feat.value("geometry", json{}).is_null())

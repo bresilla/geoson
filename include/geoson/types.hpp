@@ -24,6 +24,7 @@ namespace geoson {
         concord::Datum datum;
         concord::Euler heading;
         std::vector<Feature> features; // All geometries stored in Point (ENU/local) coordinates
+        std::unordered_map<std::string, std::string> global_properties; // Global properties for the collection
     };
 
 } // namespace geoson

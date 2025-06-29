@@ -90,6 +90,11 @@ namespace geoson {
 
             // yaw only
             P["heading"] = fc.heading.yaw;
+            
+            // Add global properties
+            for (const auto& [key, value] : fc.global_properties) {
+                P[key] = value;
+            }
         }
 
         // features (use output CRS for coordinate conversion)
