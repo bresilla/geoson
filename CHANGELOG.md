@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.1] - 2025-06-29
+
+### <!-- 0 -->⛰️  Features
+
+- Implement global properties for vector data
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Bumps concord to version 2.0.4
+
 ## [1.2.0] - 2025-06-28
 
 ### <!-- 0 -->⛰️  Features
