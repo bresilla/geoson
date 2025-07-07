@@ -1,5 +1,6 @@
 #pragma once
 
+#include "concord/concord.hpp"
 #include <arpa/inet.h>
 #include <condition_variable>
 #include <iostream>
@@ -32,6 +33,7 @@ namespace geoget {
         std::mutex done_mutex;
         std::condition_variable done_cv;
         bool single_point_mode;
+        concord::Datum datum;
 
         std::string get_html() {
             if (single_point_mode) {
@@ -400,51 +402,6 @@ namespace geoget {
                    response.dump();
         }
 
-      public:
-        PolygonDrawer() : server_fd(-1), is_done(false), single_point_mode(false) {}
-
-        ~PolygonDrawer() { stop(); }
-
-        bool start(int port = 8080) {
-            // Make sure any previous socket is closed
-            if (server_fd != -1) {
-                close(server_fd);
-                server_fd = -1;
-            }
-
-            // Reset state with proper mutex lock
-            {
-                std::lock_guard<std::mutex> lock(done_mutex);
-                is_done = false;
-            }
-            points.clear();
-
-            server_fd = socket(AF_INET, SOCK_STREAM, 0);
-            if (server_fd == -1) {
-                return false;
-            }
-
-            int opt = 1;
-            setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-            setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
-
-            struct sockaddr_in address;
-            address.sin_family = AF_INET;
-            address.sin_addr.s_addr = INADDR_ANY;
-            address.sin_port = htons(port);
-
-            if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-                return false;
-            }
-
-            if (listen(server_fd, 3) < 0) {
-                return false;
-            }
-
-            std::cout << "Polygon Drawer on http://localhost:" << port << std::endl;
-            return true;
-        }
-
         std::vector<Point> collect_points() {
             single_point_mode = false;
 
@@ -511,7 +468,53 @@ namespace geoget {
             return points.empty() ? Point{0, 0} : points[0];
         }
 
-      private:
+      public:
+        PolygonDrawer() : server_fd(-1), is_done(false), single_point_mode(false) {}
+
+        PolygonDrawer(const concord::Datum &d) : server_fd(-1), is_done(false), single_point_mode(false), datum(d) {}
+
+        ~PolygonDrawer() { stop(); }
+
+        bool start(int port = 8080) {
+            // Make sure any previous socket is closed
+            if (server_fd != -1) {
+                close(server_fd);
+                server_fd = -1;
+            }
+
+            // Reset state with proper mutex lock
+            {
+                std::lock_guard<std::mutex> lock(done_mutex);
+                is_done = false;
+            }
+            points.clear();
+
+            server_fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (server_fd == -1) {
+                return false;
+            }
+
+            int opt = 1;
+            setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+            setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+
+            struct sockaddr_in address;
+            address.sin_family = AF_INET;
+            address.sin_addr.s_addr = INADDR_ANY;
+            address.sin_port = htons(port);
+
+            if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+                return false;
+            }
+
+            if (listen(server_fd, 3) < 0) {
+                return false;
+            }
+
+            std::cout << "Polygon Drawer on http://localhost:" << port << std::endl;
+            return true;
+        }
+
         void stop() {
             if (server_fd != -1) {
                 shutdown(server_fd, SHUT_RDWR);
@@ -520,10 +523,87 @@ namespace geoget {
             }
         }
 
-      public:
-        const std::vector<Point> &get_points() const { return points; }
-        const std::vector<std::vector<Point>> &get_all_polygons() const { return all_polygons; }
-        const std::vector<Point> &get_all_single_points() const { return all_single_points; }
+        concord::Datum add_datum() {
+            single_point_mode = true;
+
+            // Reset state with proper mutex lock
+            {
+                std::lock_guard<std::mutex> lock(done_mutex);
+                is_done = false;
+            }
+            points.clear();
+
+            std::cout << "Select datum point on the map..." << std::endl;
+
+            // Start server thread
+            std::thread server_thread([this]() {
+                while (!is_done) {
+                    struct sockaddr_in client_addr;
+                    socklen_t client_len = sizeof(client_addr);
+                    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+                    if (client_fd >= 0) {
+                        std::thread([this, client_fd]() { handle_request(client_fd); }).detach();
+                    }
+                }
+            });
+
+            // Wait for completion
+            std::unique_lock<std::mutex> lock(done_mutex);
+            done_cv.wait(lock, [this] { return is_done; });
+
+            // Clean up
+            server_thread.detach();
+            stop();
+
+            // Set the datum from the selected point
+            if (!points.empty()) {
+                datum.lat = points[0].lat;
+                datum.lon = points[0].lon;
+                datum.alt = 0.0;
+                std::cout << "Datum set to: " << datum.lat << ", " << datum.lon << std::endl;
+            }
+
+            return datum;
+        }
+
+        const std::vector<std::vector<Point>> &get_all_polygons() {
+            collect_points();
+            return all_polygons;
+        }
+        const std::vector<Point> &get_all_points() {
+            collect_single_point();
+            return all_single_points;
+        }
+
+        std::vector<concord::Polygon> get_polygons() {
+            collect_points();
+            if (!datum.is_set()) {
+                throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+            }
+            std::vector<concord::Polygon> concord_polygons;
+            for (const auto &polygon : all_polygons) {
+                std::vector<concord::Point> concord_points;
+                for (const auto &point : polygon) {
+                    auto [x, y, z] = concord::gps_to_enu(point.lat, point.lon, 0.0, datum.lat, datum.lon, datum.alt);
+                    concord_points.emplace_back(x, y, z);
+                }
+                concord_polygons.emplace_back(concord_points);
+            }
+            return concord_polygons;
+        }
+
+        std::vector<concord::Point> get_points() {
+            collect_single_point();
+            if (!datum.is_set()) {
+                throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+            }
+            std::vector<concord::Point> concord_points;
+            for (const auto &point : all_single_points) {
+                auto [x, y, z] = concord::gps_to_enu(point.lat, point.lon, 0.0, datum.lat, datum.lon, datum.alt);
+                concord_points.emplace_back(x, y, z);
+            }
+            return concord_points;
+        }
     };
 
 } // namespace geoget
