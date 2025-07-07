@@ -34,6 +34,7 @@ namespace geoget {
         std::condition_variable done_cv;
         bool single_point_mode;
         concord::Datum datum;
+        bool select_point;
 
         std::string get_html() {
             if (single_point_mode) {
@@ -468,8 +469,15 @@ namespace geoget {
             return points.empty() ? Point{0, 0} : points[0];
         }
 
+        void set_datum_from_point(const Point &point) {
+            datum.lat = point.lat;
+            datum.lon = point.lon;
+            datum.alt = 0.0;
+        }
+
       public:
-        PolygonDrawer() : server_fd(-1), is_done(false), single_point_mode(false) {}
+        PolygonDrawer(bool select_point = false)
+            : server_fd(-1), is_done(false), single_point_mode(false), select_point(select_point) {}
 
         PolygonDrawer(const concord::Datum &d) : server_fd(-1), is_done(false), single_point_mode(false), datum(d) {}
 
@@ -578,16 +586,20 @@ namespace geoget {
         std::vector<concord::Polygon> get_polygons() {
             collect_points();
             if (!datum.is_set()) {
-                throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+                if (select_point) {
+                    throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+                } else {
+                    set_datum_from_point(all_single_points[0]);
+                }
             }
             std::vector<concord::Polygon> concord_polygons;
             for (const auto &polygon : all_polygons) {
-                std::vector<concord::Point> concord_points;
+                concord::Polygon concord_polygon;
                 for (const auto &point : polygon) {
                     auto [x, y, z] = concord::gps_to_enu(point.lat, point.lon, 0.0, datum.lat, datum.lon, datum.alt);
-                    concord_points.emplace_back(x, y, z);
+                    concord_polygon.addPoint(concord::Point{x, y, z});
                 }
-                concord_polygons.emplace_back(concord_points);
+                concord_polygons.push_back(concord_polygon);
             }
             return concord_polygons;
         }
@@ -595,7 +607,11 @@ namespace geoget {
         std::vector<concord::Point> get_points() {
             collect_single_point();
             if (!datum.is_set()) {
-                throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+                if (select_point) {
+                    throw std::runtime_error("Datum not set. Call add_datum() first or use constructor with datum.");
+                } else {
+                    set_datum_from_point(all_single_points[0]);
+                }
             }
             std::vector<concord::Point> concord_points;
             for (const auto &point : all_single_points) {
