@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.2] - 2025-07-07
+
+### <!-- 0 -->⛰️  Features
+
+- Refactor point selection and polygon drawing
+
 ## [1.4.1] - 2025-07-07
 
 ### <!-- 0 -->⛰️  Features
