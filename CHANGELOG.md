@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0] - 2025-07-07
+
+### <!-- 0 -->⛰️  Features
+
+- Develop geographic data collection via an embedded web server
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update concord and refactor constructors for readability
+
 ## [1.3.1] - 2025-06-29
 
 ### <!-- 0 -->⛰️  Features
