@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] - 2025-07-07
+
+### <!-- 0 -->⛰️  Features
+
+- Refactor polygon collection around a datum point
+
 ## [1.4.0] - 2025-07-07
 
 ### <!-- 0 -->⛰️  Features
