@@ -574,6 +574,8 @@ namespace geoget {
             return datum;
         }
 
+        concord::Datum get_datum() { return datum; }
+
         const std::vector<std::vector<Point>> &get_all_polygons() {
             collect_points();
             return all_polygons;
